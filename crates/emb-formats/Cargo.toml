@@ -1,0 +1,19 @@
+[package]
+name = "emb-formats"
+description = "Readers and writers for embroidery machine file formats (DST, JEF…)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+emb-core.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+insta.workspace = true
+
+[lints]
+workspace = true
