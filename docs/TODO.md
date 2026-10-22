@@ -11,7 +11,7 @@ Chaque entrée référence la section de [FEATURES.md](FEATURES.md) concernée. 
 - **Drapeaux JEF `0x14` / `0x0A`** et octets 0x16–0x17 : à comprendre et à conserver.
 - **Points « à vérifier »** des fiches [dst.md](formats/dst.md) et [jef.md](formats/jef.md) : codes de cadre JEF, convention d'arrêt (index 0), champ `0x0D`, date nulle, seuil de coupe automatique Tajima.
 - **Aller-retour JEF octet pour octet sur le corpus** (§4.5) : atteint pour les données de points de la famille `0x0A`, pour les index de couleur et pour le bloc `ENHANCE` ; restent les drapeaux, le code de cadre et les octets 0x16–0x17 de l'en-tête, ainsi que le préfixe des sauts de la famille `0x14`.
-- **Recette sur machine Janome** (§4.5) : `docs/acceptance/janome.md` à créer.
+- **Recette sur machine Janome** (§4.5) : checklist et fichiers prêts ([acceptance/janome.md](acceptance/janome.md)) ; essai à réaliser.
 
 ## Priorité utilisateur : PES → JEF
 

@@ -22,6 +22,8 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnage [
 
 - JEF : lecture et écriture du bloc `ENHANCE` (fils réels : couleur, référence numérique, nom), écrit par défaut (`JefWriter::enhance`, `emb convert --no-enhance`) ; conservation des index Janome d'origine (`jef::PALETTE_EXTENSION`) pour les conversions JEF → JEF. Avertissements `ThreadDetailsNotStored`, `ThreadNameAltered`, `UnreadTrailingData`.
 - Exigence « MCP native » : FEATURES §5.3 et ADR 0002.
+- Recette machine Janome : checklist `docs/acceptance/janome.md` et générateur des 13 fichiers d'essai (`cargo run -p emb-formats --example janome_acceptance`).
+- `.gitattributes` : fins de ligne LF sur tous les systèmes.
 - Service de conversion partagé `emb_formats::convert` (`detect`, `load`, `resolve_target`, `writer`, `convert`, `WriteOptions`, `ConvertError`) : la CLI n'en est plus qu'une façade, prête à être rejointe par le serveur MCP. Comportement de la CLI inchangé.
 
 ### Changed

@@ -25,3 +25,6 @@ rustc-ice-*.txt
 
 # Real design files that may not be redistributed (see docs/TODO.md)
 /tests/fixtures/private/
+
+# Generated files for machine acceptance tests (docs/acceptance/janome.md)
+/recette-janome/
