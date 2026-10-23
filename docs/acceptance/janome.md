@@ -14,7 +14,7 @@ cargo run --release -p emb-formats --example janome_acceptance -- recette-janome
 
 puis copier les JEF d'origine comme témoins `T1` à `T5` (fait automatiquement lors de la préparation du 2026-10-23).
 
-- `recette-janome/USB/` : **le contenu à copier tel quel sur la clé** (39 fichiers).
+- `recette-janome/USB/` : **le contenu à copier tel quel sur la clé** (40 fichiers).
 - `recette-janome/USB.txt` : ce que contient chaque fichier, et ce que la conversion a approché ou perdu. À garder sur l'ordinateur.
 
 **Code de cadre.** Les codes JEF des cadres SQ20b, RE20b et RE28b ne sont pas encore connus. Sauf mention contraire, chaque fichier déclare le **code 4** (200 × 200 dans la table de pyembroidery). La série `H` sert à découvrir les vrais codes.
@@ -88,6 +88,7 @@ Rectangles qui remplissent presque chaque cadre, avec une croix au centre. **Cha
 | `R5` | narrow-sport (PES) | `T5` | 50,2 × 89 mm, 3 couleurs |  |
 | `R6` | 3 inch 33 (DST) | `T1` | Doit apparaître **décentré** (son DST d'origine l'est) |  |
 | `R7` à `RA` | Labubu, Love1, OAD, narrow-sport (DST) | `T2` à `T5` | Mêmes dimensions que les témoins |  |
+| `RB` | Birds 6x10 (PES) | — | 141,5 × 251,9 mm, 19 couleurs (dont 4 arrêts sur le même noir) ; ne tient que dans le **RE28b** (déclaré avec le code 4, comme `S3`) : noter si la machine l'accepte |  |
 
 Pour la broderie de `R3`, noter :
 

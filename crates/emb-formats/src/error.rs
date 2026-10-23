@@ -36,7 +36,7 @@ pub enum FormatError {
     /// The design does not fit in any hoop of the target format.
     #[error(
         "design extends {} mm horizontally and {} mm vertically from the hoop centre, \
-         which exceeds the largest {format} hoop",
+         which exceeds every hoop known for {format} so far",
         .half_width.get(), .half_height.get()
     )]
     DesignTooLarge {

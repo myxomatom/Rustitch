@@ -6,9 +6,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use emb_core::{EPSILON_MM, Mm, StitchKind, StitchPattern};
+use emb_formats::jef::JefWriter;
 use emb_formats::jef::PALETTE_EXTENSION;
 use emb_formats::jef::palette::JANOME_PALETTE;
-use emb_formats::{Format, MachinePattern, Warning};
+use emb_formats::{Format, FormatError, FormatWriter, Hoop, MachinePattern, Warning, WriteOutput};
 
 use crate::{read, write};
 
@@ -24,7 +25,11 @@ fn files(format: Format) -> Vec<PathBuf> {
             entries
                 .filter_map(Result::ok)
                 .map(|e| e.path())
-                .filter(|p| p.extension().and_then(|e| e.to_str()) == Some(format.extension()))
+                .filter(|p| {
+                    p.extension()
+                        .and_then(|e| e.to_str())
+                        .is_some_and(|e| e.eq_ignore_ascii_case(format.extension()))
+                })
                 .collect()
         })
         .unwrap_or_default();
@@ -36,6 +41,47 @@ fn files(format: Format) -> Vec<PathBuf> {
         );
     }
     files
+}
+
+/// Size of the largest hoop of the test machine (Janome `RE28b`). Its JEF code
+/// is still unknown and irrelevant to these tests.
+const RE28B_SIZE: Hoop = Hoop {
+    name: "RE28b 200 x 280 mm",
+    code: 4,
+    width: Mm(200.0),
+    height: Mm(280.0),
+};
+
+/// Writes a real design. A design larger than every known JEF hoop must be
+/// refused (never truncated); it is then written in a hoop of the `RE28b`'s
+/// size so that the fidelity checks still apply to it.
+fn write_real(format: Format, pattern: &StitchPattern) -> (Vec<u8>, WriteOutput) {
+    if format != Format::Jef {
+        return write(format, pattern);
+    }
+    let mut bytes = Vec::new();
+    match JefWriter::default().write(pattern, &mut bytes) {
+        Ok(output) => (bytes, output),
+        Err(FormatError::DesignTooLarge {
+            half_width,
+            half_height,
+            ..
+        }) => {
+            let largest_half = Mm(100.0);
+            assert!(
+                half_width > largest_half || half_height > largest_half,
+                "refused although it fits 200 x 200: {half_width:?} x {half_height:?}"
+            );
+            let writer = JefWriter {
+                hoop: Some(RE28B_SIZE),
+                ..JefWriter::default()
+            };
+            let mut bytes = Vec::new();
+            let output = writer.write(pattern, &mut bytes).unwrap();
+            (bytes, output)
+        }
+        Err(error) => panic!("JEF write failed: {error}"),
+    }
 }
 
 fn read_file(format: Format, path: &Path) -> (Vec<u8>, StitchPattern, Vec<Warning>) {
@@ -120,7 +166,7 @@ fn real_files_convert_to_every_writable_format_without_moving_a_stitch() {
         for path in files(source) {
             let (_, pattern, _) = read_file(source, &path);
             for target in Format::WRITABLE {
-                let (bytes, _) = write(target, &pattern);
+                let (bytes, _) = write_real(target, &pattern);
                 let back = read(target, &bytes).pattern;
                 assert_eq!(
                     normal_stitches_per_block(&back),
@@ -143,7 +189,7 @@ fn pes_threads_survive_in_jef_and_approximations_are_reported() {
         if warnings.contains(&Warning::ThreadListUnreadable) {
             continue;
         }
-        let (bytes, output) = write(Format::Jef, &pattern);
+        let (bytes, output) = write_real(Format::Jef, &pattern);
         let jef = read(Format::Jef, &bytes).pattern;
         let indices = &jef.extensions[PALETTE_EXTENSION];
         for (block, (source, read_back)) in pattern.threads().iter().zip(jef.threads()).enumerate()
@@ -177,7 +223,7 @@ fn real_designs_keep_distinct_threads_distinct_in_jef() {
     for source in Format::ALL {
         for path in files(source) {
             let (_, pattern, _) = read_file(source, &path);
-            let (_, output) = write(Format::Jef, &pattern);
+            let (_, output) = write_real(Format::Jef, &pattern);
             let shared: Vec<_> = output
                 .warnings
                 .iter()
@@ -258,7 +304,7 @@ fn jef_palette(bytes: &[u8]) -> Vec<u32> {
 fn jef_colours_and_enhance_block_are_rewritten_identically() {
     for path in files(Format::Jef) {
         let (original, pattern, _) = read_file(Format::Jef, &path);
-        let (rewritten, _) = write(Format::Jef, &pattern);
+        let (rewritten, _) = write_real(Format::Jef, &pattern);
         assert_eq!(
             jef_palette(&rewritten),
             jef_palette(&original),
@@ -284,7 +330,7 @@ fn jump_run_prefix_family_stitch_data_is_rewritten_byte_for_byte() {
         if original[4] != 0x0A {
             continue;
         }
-        let (rewritten, _) = write(Format::Jef, &pattern);
+        let (rewritten, _) = write_real(Format::Jef, &pattern);
         assert!(
             jef_stitch_data(&rewritten) == jef_stitch_data(&original),
             "{}",

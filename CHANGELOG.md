@@ -34,5 +34,10 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnage [
 
 - JEF : par défaut, deux fils distincts ne reçoivent plus le même index Janome (golden file `near_neutrals_jef` mis à jour : blancs cassés → White et Ivory White, noir et anthracite → Black et Dark Sepia). Le texte de l'avertissement `ThreadApproximated` ne parle plus de « nearest ».
 - `jef::palette::nearest_palette_entry` est remplacée par `jef::palette::match_threads`.
+- Message `DesignTooLarge` : « dépasse tous les cadres connus » au lieu de « le plus grand cadre », la table de cadres étant incomplète.
+
+### Fixed
+
+- Tests du corpus privé : l'extension des fichiers est comparée sans tenir compte de la casse (`Birds6x10.PES` était ignoré) ; un design plus grand que tous les cadres JEF connus est vérifié comme légitimement refusé, puis testé dans un cadre de la taille du RE28b.
 - `Format::writer` renvoie une `Option` (PES n'est pas encore inscriptible).
 - JEF : chaque série de sauts est précédée d'un saut nul, comme dans les fichiers réels ; ce préfixe est retiré à la lecture. Les coupes ne sont plus encodées en trois sauts nuls (hypothèse infirmée par le corpus) : elles ne sont pas écrites et l'avertissement `TrimsNotStored` les compte. L'avertissement `ZeroLengthJumpsRemoved` disparaît.

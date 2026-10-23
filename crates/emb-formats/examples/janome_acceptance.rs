@@ -370,8 +370,8 @@ fn hoops(directory: &Path, index: &mut String) -> Result<()> {
     Ok(())
 }
 
-/// Converts the real files with the `SQ20b` hoop declared (code 4), or the
-/// default hoop choice if the design does not fit in it.
+/// Converts the real files with the first of the machine hoops that holds
+/// them (`SQ20b`, then `RE28b`, both with code 4), or the default hoop choice.
 fn real(directory: &Path, index: &mut String, files: &[String]) -> Result<()> {
     for (n, file) in files.iter().enumerate() {
         let path = Path::new(file);
@@ -380,12 +380,26 @@ fn real(directory: &Path, index: &mut String, files: &[String]) -> Result<()> {
         if pattern.metadata.date.is_none() {
             pattern.metadata.date = Timestamp::parse_compact("20261023120000");
         }
-        let sq20b = with_hoop(SQ20B);
-        let writer = match sq20b.write(&pattern, &mut Vec::new()) {
-            Err(FormatError::DesignTooLarge { .. }) => JefWriter::default(),
-            _ => sq20b,
+        // The first of the machine's hoops that holds the design.
+        let fits = |hoop: Hoop| {
+            !matches!(
+                with_hoop(hoop).write(&pattern, &mut Vec::new()),
+                Err(FormatError::DesignTooLarge { .. })
+            )
         };
-        write(directory, index, (&real_name(n)?, file), writer, &pattern)?;
+        let hoop = [SQ20B, RE28B].into_iter().find(|&h| fits(h));
+        let writer = hoop.map_or_else(JefWriter::default, with_hoop);
+        let description = format!(
+            "{file} ({})",
+            hoop.map_or("smallest known hoop", |h| h.name)
+        );
+        write(
+            directory,
+            index,
+            (&real_name(n)?, &description),
+            writer,
+            &pattern,
+        )?;
     }
     Ok(())
 }
