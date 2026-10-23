@@ -29,6 +29,7 @@
 use emb_core::{MatchStrategy, StitchPattern, Timestamp};
 use thiserror::Error;
 
+use crate::capabilities::Hoop;
 use crate::codec::{FormatWriter, ReadOutput};
 use crate::error::FormatError;
 use crate::format::Format;
@@ -142,7 +143,7 @@ pub fn resolve_target(
 
 /// Writer options; `None` keeps the writer's default. Each option applies to
 /// one format only, and setting it for another target is an error.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WriteOptions {
     /// JEF: placement of the design in the hoop.
     pub placement: Option<Placement>,
@@ -150,6 +151,8 @@ pub struct WriteOptions {
     pub colors: Option<MatchStrategy>,
     /// JEF: whether to append the `ENHANCE` block with the real threads.
     pub enhance: Option<bool>,
+    /// JEF: hoop to write instead of the smallest known hoop that fits.
+    pub hoop: Option<Hoop>,
 }
 
 impl WriteOptions {
@@ -159,6 +162,7 @@ impl WriteOptions {
             ("placement", self.placement.is_some()),
             ("colors", self.colors.is_some()),
             ("enhance", self.enhance.is_some()),
+            ("hoop", self.hoop.is_some()),
         ]
         .into_iter()
         .filter_map(|(name, set)| set.then_some(name))
@@ -180,6 +184,7 @@ pub fn writer(
             placement: options.placement.unwrap_or(defaults.placement),
             colors: options.colors.unwrap_or(defaults.colors),
             enhance: options.enhance.unwrap_or(defaults.enhance),
+            hoop: options.hoop.or(defaults.hoop),
         }));
     }
     if let Some(option) = options.set_options().next() {
@@ -193,7 +198,7 @@ pub fn writer(
 }
 
 /// What to convert to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ConvertRequest {
     /// Target format.
     pub target: Format,

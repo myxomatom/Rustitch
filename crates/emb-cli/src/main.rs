@@ -78,6 +78,7 @@ impl JefOptions {
             placement: self.center.then_some(Placement::Center),
             colors: self.colors.map(MatchStrategy::from),
             enhance: self.no_enhance.then_some(false),
+            ..WriteOptions::default()
         }
     }
 }

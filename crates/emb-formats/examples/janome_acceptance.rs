@@ -1,21 +1,25 @@
-//! Generates the synthetic JEF files of the Janome machine acceptance
-//! checklist (`docs/acceptance/janome.md`).
+//! Generates the JEF files of the Janome machine acceptance checklist
+//! (`docs/acceptance/janome.md`), for a machine with the `SQ20b` (200 x 200),
+//! `RE20b` (170 x 200) and `RE28b` (200 x 280) hoops.
 //!
 //! ```text
-//! cargo run -p emb-formats --example janome_acceptance -- <output directory>
+//! cargo run -p emb-formats --example janome_acceptance -- <usb directory> [real files...]
 //! ```
 //!
-//! Every design is deterministic (fixed date) and drawn here: the files can
-//! be shared freely.
+//! File names are two characters long (`01.jef`, `H4.jef`, `R1.jef`…), as
+//! some machines require; `<usb directory>.txt` lists what each file is.
+//! The synthetic designs are deterministic (fixed date) and drawn here.
 
 use std::error::Error;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::Path;
 
 use emb_core::{Mm, Point, Rgb, Stitch, StitchKind, StitchPattern, Thread, Timestamp};
-use emb_formats::FormatWriter;
+use emb_formats::convert::load;
 use emb_formats::jef::palette::{JANOME_PALETTE, palette_thread};
 use emb_formats::jef::{JefWriter, Placement};
+use emb_formats::{FormatError, FormatWriter, Hoop};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -58,12 +62,8 @@ fn path(points: &[(f64, f64)], step: f64) -> Vec<Stitch> {
 
 /// Closed rectangle outline centred on (`cx`, `cy`).
 fn rectangle(cx: f64, cy: f64, width: f64, height: f64, step: f64) -> Vec<Stitch> {
-    let (l, r, b, t) = (
-        cx - width / 2.0,
-        cx + width / 2.0,
-        cy - height / 2.0,
-        cy + height / 2.0,
-    );
+    let (l, r) = (cx - width / 2.0, cx + width / 2.0);
+    let (b, t) = (cy - height / 2.0, cy + height / 2.0);
     path(&[(l, b), (r, b), (r, t), (l, t), (l, b)], step)
 }
 
@@ -90,21 +90,21 @@ fn janome(code: &str) -> Result<Thread> {
 fn design(stitches: Vec<Stitch>, threads: Vec<Thread>, name: &str) -> Result<StitchPattern> {
     let mut pattern = StitchPattern::new(stitches, threads)?;
     pattern.metadata.name = Some(name.to_owned());
-    pattern.metadata.date = Timestamp::parse_compact("20261022120000");
+    pattern.metadata.date = Timestamp::parse_compact("20261023120000");
     Ok(pattern)
 }
 
-/// 01: an "F" and an arrow pointing to the top of the design.
+/// An "F" and an arrow pointing to the top of the design.
 fn orientation() -> Result<StitchPattern> {
     let mut stitches = path(&[(-10.0, -15.0), (-10.0, 15.0), (6.0, 15.0)], 2.5);
     stitches.extend(path(&[(-10.0, 0.0), (2.0, 0.0)], 2.5));
     stitches.extend(path(&[(15.0, -15.0), (15.0, 15.0)], 2.5));
     stitches.extend(path(&[(11.0, 10.0), (15.0, 15.0), (19.0, 10.0)], 2.0));
-    design(stitches, vec![janome("002")?], "01 orientation")
+    design(stitches, vec![janome("002")?], "orientation")
 }
 
-/// 02: a rectangle just inside a hoop, to check the hoop the machine picks.
-fn hoop(width: f64, height: f64, name: &str) -> Result<StitchPattern> {
+/// A rectangle with a cross at its centre.
+fn frame(width: f64, height: f64, name: &str) -> Result<StitchPattern> {
     let mut stitches = rectangle(0.0, 0.0, width, height, 3.0);
     stitches.extend(path(&[(-5.0, 0.0), (5.0, 0.0)], 2.5));
     stitches.extend(path(&[(0.0, -5.0), (0.0, 5.0)], 2.5));
@@ -122,7 +122,7 @@ fn madeira(rgb: u32, code: &str, name: &str) -> Thread {
     }
 }
 
-/// 03: six numbered squares (1 to 6 stitches across) in six colours.
+/// Six squares in six colours.
 fn colours() -> Result<StitchPattern> {
     let threads = vec![
         madeira(0xFC_C68D, "1026", "Orange Sorbet"),
@@ -139,10 +139,10 @@ fn colours() -> Result<StitchPattern> {
             rectangle(cx, cy, 10.0, 10.0, 2.0)
         })
         .collect();
-    design(blocks(parts), threads, "03 couleurs")
+    design(blocks(parts), threads, "colours")
 }
 
-/// 04: three pairs of crosses joined by jumps of 3, 15 and 60 mm; the two
+/// Three pairs of crosses joined by jumps of 3, 15 and 60 mm; the two
 /// longer jumps are preceded by a trim in the source design.
 fn jumps_and_trims() -> Result<StitchPattern> {
     let cross = |cx: f64, cy: f64| {
@@ -162,10 +162,10 @@ fn jumps_and_trims() -> Result<StitchPattern> {
         }
         stitches.extend(cross(-left, row));
     }
-    design(stitches, vec![janome("002")?], "04 sauts coupes")
+    design(stitches, vec![janome("002")?], "jumps")
 }
 
-/// 05: zigzags with stitches of 5, 10 and 12.7 mm, then one 20 mm stitch
+/// Zigzags with stitches of 5, 10 and 12.7 mm, then one 20 mm stitch
 /// (written as jumps followed by a stitch: the JEF limit is 12.7 mm).
 fn long_stitches() -> Result<StitchPattern> {
     let mut stitches = vec![
@@ -182,75 +182,227 @@ fn long_stitches() -> Result<StitchPattern> {
     stitches.push(at(StitchKind::Jump, -10.0, -25.0));
     stitches.push(at(StitchKind::Normal, -10.0, -25.0));
     stitches.push(at(StitchKind::Normal, 10.0, -25.0));
-    design(stitches, vec![janome("002")?], "05 points longs")
+    design(stitches, vec![janome("002")?], "long stitches")
 }
 
-/// 06: a small square away from the origin, to compare placements.
+/// A small square away from the origin, to compare placements.
 fn offset_square() -> Result<StitchPattern> {
     design(
         rectangle(30.0, 20.0, 20.0, 20.0, 2.5),
         vec![janome("002")?],
-        "06 centrage",
+        "offset",
     )
 }
 
-fn write(directory: &Path, file: &str, writer: JefWriter, pattern: &StitchPattern) -> Result<()> {
+/// Hoop with a known size and a given JEF code.
+const fn hoop(name: &'static str, code: i32, width: f64, height: f64) -> Hoop {
+    Hoop {
+        name,
+        code,
+        width: Mm(width),
+        height: Mm(height),
+    }
+}
+
+/// The codes of the `SQ20b`, `RE20b` and `RE28b` hoops are unknown (the H files are
+/// there to find them): until then, every file declares code 4, the
+/// 200 x 200 hoop of pyembroidery's table.
+const DEFAULT_CODE: i32 = 4;
+const SQ20B: Hoop = hoop("SQ20b 200 x 200 mm", DEFAULT_CODE, 200.0, 200.0);
+const RE20B: Hoop = hoop("RE20b 170 x 200 mm", DEFAULT_CODE, 170.0, 200.0);
+const RE28B: Hoop = hoop("RE28b 200 x 280 mm", DEFAULT_CODE, 200.0, 280.0);
+
+/// Codes written by the hoop probes: those of pyembroidery's table and
+/// their neighbours (0 to 8), and those seen in real files (14, 40, 65535).
+const PROBES: [(&str, i32); 12] = [
+    ("H0", 0),
+    ("H1", 1),
+    ("H2", 2),
+    ("H3", 3),
+    ("H4", 4),
+    ("H5", 5),
+    ("H6", 6),
+    ("H7", 7),
+    ("H8", 8),
+    ("HA", 14),
+    ("HB", 40),
+    ("HC", 65535),
+];
+
+/// Writes `<name>.jef` and records it in `index`.
+fn write(
+    directory: &Path,
+    index: &mut String,
+    (name, description): (&str, &str),
+    writer: JefWriter,
+    pattern: &StitchPattern,
+) -> Result<()> {
     let mut bytes = Vec::new();
     let output = writer.write(pattern, &mut bytes)?;
-    fs::write(directory.join(file), bytes)?;
-    println!("{file}");
+    fs::write(directory.join(format!("{name}.jef")), bytes)?;
+    writeln!(index, "{name}.jef  {description}")?;
     for warning in output.warnings {
-        println!("    note: {warning}");
+        writeln!(index, "            note: {warning}")?;
+    }
+    Ok(())
+}
+
+/// Two-character name of the `n`-th real file: R1 to R9, then RA to RZ.
+fn real_name(n: usize) -> Result<String> {
+    let digit = char::from_digit(u32::try_from(n + 1)?, 36).ok_or("too many real files")?;
+    Ok(format!("R{}", digit.to_ascii_uppercase()))
+}
+
+fn with_hoop(hoop: Hoop) -> JefWriter {
+    JefWriter {
+        hoop: Some(hoop),
+        ..JefWriter::default()
+    }
+}
+
+fn synthetic(directory: &Path, index: &mut String) -> Result<()> {
+    let sq20b = with_hoop(SQ20B);
+    let orientation = orientation()?;
+    write(
+        directory,
+        index,
+        ("01", "orientation: F and arrow up"),
+        sq20b,
+        &orientation,
+    )?;
+    let colours = colours()?;
+    write(
+        directory,
+        index,
+        ("02", "6 colours, with ENHANCE"),
+        sq20b,
+        &colours,
+    )?;
+    let plain = JefWriter {
+        enhance: false,
+        ..sq20b
+    };
+    write(
+        directory,
+        index,
+        ("03", "6 colours, without ENHANCE"),
+        plain,
+        &colours,
+    )?;
+    write(
+        directory,
+        index,
+        ("04", "jumps of 3, 15, 60 mm"),
+        sq20b,
+        &jumps_and_trims()?,
+    )?;
+    write(
+        directory,
+        index,
+        ("05", "long stitches"),
+        sq20b,
+        &long_stitches()?,
+    )?;
+    let square = offset_square()?;
+    write(
+        directory,
+        index,
+        ("06", "offset square, kept"),
+        sq20b,
+        &square,
+    )?;
+    let centred = JefWriter {
+        placement: Placement::Center,
+        ..sq20b
+    };
+    write(
+        directory,
+        index,
+        ("07", "offset square, centred"),
+        centred,
+        &square,
+    )?;
+    let mut undated = orientation;
+    undated.metadata.date = None;
+    write(
+        directory,
+        index,
+        ("08", "orientation, no date"),
+        sq20b,
+        &undated,
+    )?;
+    Ok(())
+}
+
+/// Hoop size tests and hoop code probes.
+fn hoops(directory: &Path, index: &mut String) -> Result<()> {
+    let sizes = [
+        ("S1", "196 x 196 mm (SQ20b), code 4", 196.0, 196.0, SQ20B),
+        ("S2", "166 x 196 mm (RE20b), code 4", 166.0, 196.0, RE20B),
+        ("S3", "196 x 276 mm (RE28b), code 4", 196.0, 276.0, RE28B),
+        (
+            "S4",
+            "196 x 276 mm (RE28b), code 65535",
+            196.0,
+            276.0,
+            Hoop {
+                code: 65535,
+                ..RE28B
+            },
+        ),
+    ];
+    for (name, description, width, height, hoop) in sizes {
+        let pattern = frame(width, height, name)?;
+        write(
+            directory,
+            index,
+            (name, description),
+            with_hoop(hoop),
+            &pattern,
+        )?;
+    }
+    let probe = frame(30.0, 30.0, "probe")?;
+    for (name, code) in PROBES {
+        let description = format!("hoop code {code}");
+        let writer = with_hoop(Hoop { code, ..SQ20B });
+        write(directory, index, (name, &description), writer, &probe)?;
+    }
+    Ok(())
+}
+
+/// Converts the real files with the `SQ20b` hoop declared (code 4), or the
+/// default hoop choice if the design does not fit in it.
+fn real(directory: &Path, index: &mut String, files: &[String]) -> Result<()> {
+    for (n, file) in files.iter().enumerate() {
+        let path = Path::new(file);
+        let extension = path.extension().and_then(|e| e.to_str());
+        let mut pattern = load(&fs::read(path)?, extension)?.output.pattern;
+        if pattern.metadata.date.is_none() {
+            pattern.metadata.date = Timestamp::parse_compact("20261023120000");
+        }
+        let sq20b = with_hoop(SQ20B);
+        let writer = match sq20b.write(&pattern, &mut Vec::new()) {
+            Err(FormatError::DesignTooLarge { .. }) => JefWriter::default(),
+            _ => sq20b,
+        };
+        write(directory, index, (&real_name(n)?, file), writer, &pattern)?;
     }
     Ok(())
 }
 
 fn main() -> Result<()> {
-    let directory = std::env::args()
-        .nth(1)
-        .ok_or("usage: janome_acceptance <output directory>")?;
+    let mut args = std::env::args().skip(1);
+    let directory = args
+        .next()
+        .ok_or("usage: janome_acceptance <usb directory> [real files...]")?;
+    let real_files: Vec<String> = args.collect();
     let directory = Path::new(&directory);
     fs::create_dir_all(directory)?;
-    let default = JefWriter::default();
-    write(directory, "01-orientation.jef", default, &orientation()?)?;
-    let hoops = [
-        ("02a-cadre-50x50.jef", 46.0, 46.0),
-        ("02b-cadre-110x110.jef", 104.0, 104.0),
-        ("02c-cadre-126x110.jef", 120.0, 104.0),
-        ("02d-cadre-140x200.jef", 134.0, 194.0),
-        ("02e-cadre-200x200.jef", 194.0, 194.0),
-    ];
-    for (file, width, height) in hoops {
-        write(directory, file, default, &hoop(width, height, file)?)?;
-    }
-    let colours = colours()?;
-    write(
-        directory,
-        "03a-couleurs-avec-enhance.jef",
-        default,
-        &colours,
-    )?;
-    let plain = JefWriter {
-        enhance: false,
-        ..default
-    };
-    write(directory, "03b-couleurs-sans-enhance.jef", plain, &colours)?;
-    write(
-        directory,
-        "04-sauts-coupes.jef",
-        default,
-        &jumps_and_trims()?,
-    )?;
-    write(directory, "05-points-longs.jef", default, &long_stitches()?)?;
-    let square = offset_square()?;
-    write(directory, "06a-centrage-conserve.jef", default, &square)?;
-    let centred = JefWriter {
-        placement: Placement::Center,
-        ..default
-    };
-    write(directory, "06b-centrage-centre.jef", centred, &square)?;
-    let mut undated = orientation()?;
-    undated.metadata.date = None;
-    write(directory, "07-sans-date.jef", default, &undated)?;
+    let mut index = String::new();
+    synthetic(directory, &mut index)?;
+    hoops(directory, &mut index)?;
+    real(directory, &mut index, &real_files)?;
+    fs::write(directory.with_extension("txt"), &index)?;
+    print!("{index}");
     Ok(())
 }

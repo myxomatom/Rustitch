@@ -24,6 +24,8 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnage [
 - Exigence « MCP native » : FEATURES §5.3 et ADR 0002.
 - Recette machine Janome : checklist `docs/acceptance/janome.md` et générateur des 13 fichiers d'essai (`cargo run -p emb-formats --example janome_acceptance`).
 - `.gitattributes` : fins de ligne LF sur tous les systèmes.
+- JEF : choix manuel du cadre (`JefWriter::hoop`, `WriteOptions::hoop`), y compris un cadre absent de la table connue comme le RE28b (200 × 280 mm).
+- Recette adaptée aux cadres SQ20b, RE20b et RE28b : noms de fichiers sur 2 caractères, sondes de codes de cadre (série H), tailles de cadre (série S), designs réels et témoins.
 - Service de conversion partagé `emb_formats::convert` (`detect`, `load`, `resolve_target`, `writer`, `convert`, `WriteOptions`, `ConvertError`) : la CLI n'en est plus qu'une façade, prête à être rejointe par le serveur MCP. Comportement de la CLI inchangé.
 
 ### Changed

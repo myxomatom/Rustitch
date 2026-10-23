@@ -165,7 +165,7 @@ Règles communes :
 
 ### 4.2 Choix du cadre (hoop)
 ◐ Sélection automatique du plus petit cadre Janome contenant le motif, centré.
-☐ Choix manuel ou par modèle de machine cible (profils de machines Janome avec leurs cadres disponibles).
+◐ Choix manuel ou par modèle de machine cible (profils de machines Janome avec leurs cadres disponibles).
 ☑ Erreur explicite si le motif dépasse le plus grand cadre de la machine ciblée (jamais de troncature silencieuse).
 
 ### 4.3 Fidélité des couleurs vers JEF

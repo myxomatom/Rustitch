@@ -104,6 +104,9 @@ pub struct JefWriter {
     /// Append the `ENHANCE` block with the real threads (colour, catalogue
     /// number, name) after the end marker (on by default).
     pub enhance: bool,
+    /// Hoop to write, instead of the smallest known hoop that fits (FEATURES
+    /// §4.2). Its code is written as is; the design must fit in it.
+    pub hoop: Option<Hoop>,
 }
 
 impl Default for JefWriter {
@@ -112,6 +115,7 @@ impl Default for JefWriter {
             placement: Placement::default(),
             colors: MatchStrategy::default(),
             enhance: true,
+            hoop: None,
         }
     }
 }
@@ -193,7 +197,7 @@ impl FormatWriter for JefWriter {
             mut warnings,
         } = normalize(machine, &JEF_CAPABILITIES)?;
         let extents = Extents::of(&machine);
-        let hoop = choose_hoop(&extents)?;
+        let hoop = choose_hoop(&extents, self.hoop.as_ref())?;
         let preserved = pattern.extensions.get(PALETTE_EXTENSION).map(Vec::as_slice);
         let colors = choose_colors(machine.threads(), preserved, self.colors, &mut warnings);
         let body = encode_stitches(&machine)?;
@@ -213,13 +217,15 @@ impl FormatWriter for JefWriter {
     }
 }
 
-/// Smallest hoop that contains the design around its centre.
-fn choose_hoop(extents: &Extents) -> Result<&'static Hoop, FormatError> {
-    for hoop in &JEF_HOOPS {
+/// The manual hoop if given, otherwise the smallest known hoop; in both
+/// cases the design must fit around the hoop centre.
+fn choose_hoop(extents: &Extents, manual: Option<&Hoop>) -> Result<Hoop, FormatError> {
+    let candidates = manual.map_or(&JEF_HOOPS[..], std::slice::from_ref);
+    for hoop in candidates {
         let width = i64::from(quantize(hoop.width, UNITS_PER_MM)?);
         let height = i64::from(quantize(hoop.height, UNITS_PER_MM)?);
         if 2 * extents.half_width() <= width && 2 * extents.half_height() <= height {
-            return Ok(hoop);
+            return Ok(*hoop);
         }
     }
     let to_mm = |units: i64| dequantize(i32::try_from(units).unwrap_or(i32::MAX), UNITS_PER_MM);
@@ -723,13 +729,55 @@ mod tests {
             right: 0,
             bottom: 0,
         };
-        assert_eq!(choose_hoop(&extents(250, 250)).unwrap().code, 1);
-        assert_eq!(choose_hoop(&extents(251, 250)).unwrap().code, 0);
-        assert_eq!(choose_hoop(&extents(600, 500)).unwrap().code, 3);
-        assert_eq!(choose_hoop(&extents(700, 1000)).unwrap().code, 2);
-        assert_eq!(choose_hoop(&extents(1000, 1000)).unwrap().code, 4);
+        assert_eq!(choose_hoop(&extents(250, 250), None).unwrap().code, 1);
+        assert_eq!(choose_hoop(&extents(251, 250), None).unwrap().code, 0);
+        assert_eq!(choose_hoop(&extents(600, 500), None).unwrap().code, 3);
+        assert_eq!(choose_hoop(&extents(700, 1000), None).unwrap().code, 2);
+        assert_eq!(choose_hoop(&extents(1000, 1000), None).unwrap().code, 4);
         assert!(matches!(
-            choose_hoop(&extents(1001, 10)),
+            choose_hoop(&extents(1001, 10), None),
+            Err(FormatError::DesignTooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn manual_hoop_is_written_if_the_design_fits() {
+        let tall = Hoop {
+            name: "200 x 280 mm",
+            code: 77,
+            width: Mm(200.0),
+            height: Mm(280.0),
+        };
+        let pattern = StitchPattern::new(
+            vec![
+                at(StitchKind::Normal, -90.0, -130.0),
+                at(StitchKind::Normal, 90.0, 130.0),
+            ],
+            vec![black()],
+        )
+        .unwrap();
+        // Too tall for every known hoop, but not for the manual one.
+        let mut sink = Vec::new();
+        assert!(matches!(
+            JefWriter::default().write(&pattern, &mut sink),
+            Err(FormatError::DesignTooLarge { .. })
+        ));
+        let writer = JefWriter {
+            hoop: Some(tall),
+            ..JefWriter::default()
+        };
+        let (bytes, _) = write_with(writer, &pattern);
+        assert_eq!(header_i32(&bytes, 0x20), 77);
+        let small = Hoop {
+            height: Mm(250.0),
+            ..tall
+        };
+        let writer = JefWriter {
+            hoop: Some(small),
+            ..JefWriter::default()
+        };
+        assert!(matches!(
+            writer.write(&pattern, &mut sink),
             Err(FormatError::DesignTooLarge { .. })
         ));
     }
