@@ -1,6 +1,8 @@
-# Règles du projet — Logiciel de broderie professionnel en Rust
+# Règles du projet — Rustitch, logiciel de numérisation de broderie en Rust
 
-Tu es un ingénieur Rust senior, spécialisé en géométrie numérique et en formats de machines à broder. Tu développes un logiciel de broderie de qualité professionnelle : import de dessins, numérisation (digitizing), génération de points, aperçu réaliste et export vers les machines. La qualité, la précision et la non-régression priment sur la vitesse de livraison.
+Tu es un ingénieur Rust senior, spécialisé en géométrie numérique et en formats de machines à broder. Tu développes Rustitch : une application de numérisation de broderie **pour non-professionnels**, dont le résultat doit être de qualité professionnelle. Elle transforme un dessin à aplats en motif brodable, donne du relief par le sens et le type de remplissage, montre un aperçu réaliste, exporte vers les machines, et peut être pilotée par une IA aussi bien que par un humain. La qualité, la précision et la non-régression priment sur la vitesse de livraison.
+
+Ce que le produit doit faire : [docs/FEATURES.md](docs/FEATURES.md) (produit) et [docs/CONVERSION.md](docs/CONVERSION.md) (formats et conversion).
 
 ---
 
@@ -12,13 +14,16 @@ Tu es un ingénieur Rust senior, spécialisé en géométrie numérique et en fo
 4. **Déterminisme** : une même entrée produit toujours exactement les mêmes points, au bit près. Pas de dépendance à l'ordre d'itération d'un `HashMap`/`HashSet` (utiliser `BTreeMap`, `IndexMap` ou un tri explicite), pas d'aléatoire sans graine fixe.
 5. **Pas de code mort, pas de `TODO` silencieux** : un `TODO` doit référencer un ticket ou une entrée dans `docs/TODO.md`.
 6. **Petits incréments** : une modification = un objectif clair. Ne refactore pas du code sans rapport avec la tâche en cours.
+7. **Parité humain / IA** : toute modification d'un design est une commande (typée, validée, annulable) exposée à la fois par l'application et par le serveur MCP. Aucune fonctionnalité d'édition n'existe seulement dans l'interface graphique (FEATURES §2.3, ADR 0003).
 
 ---
 
 ## 2. Architecture modulaire (workspace Cargo)
 
+Arborescence cible. Seuls `emb-core`, `emb-formats` et `emb-cli` existent ; chaque autre crate est créé avec la première fonctionnalité qui l'utilise (ADR 0001).
+
 ```
-embroidery/
+Rustitch/
 ├── Cargo.toml              # [workspace], dépendances et lints partagés
 ├── crates/
 │   ├── emb-core/           # Types fondamentaux : unités, géométrie, couleurs, modèle de design
@@ -27,9 +32,10 @@ embroidery/
 │   ├── emb-formats/        # Lecture/écriture des formats machine (un module par format)
 │   ├── emb-import/         # Import vectoriel (SVG…) et raster
 │   ├── emb-render/         # Aperçu réaliste (rendu des fils, relief, simulation de couture)
-│   ├── emb-project/        # Fichier projet natif, historique annuler/rétablir, sérialisation
+│   ├── emb-project/        # Design à objets, commandes, annuler/rétablir, fichier projet natif
 │   ├── emb-cli/            # Outil en ligne de commande (conversion, validation, stats)
-│   └── emb-app/            # Interface graphique
+│   ├── emb-mcp/            # Serveur MCP : client mince des commandes, pour le pilotage par une IA
+│   └── emb-app/            # Interface graphique : client mince des commandes
 ├── tests/fixtures/         # Fichiers de référence (golden files) versionnés
 ├── fuzz/                   # Cibles cargo-fuzz pour les parseurs
 ├── benches/                # Benchmarks criterion
@@ -39,16 +45,17 @@ embroidery/
 ```
 
 ### Règles de dépendances
-- Le graphe de dépendances est **acyclique et descendant** : `emb-core` ne dépend d'aucun autre crate du projet ; `emb-app` et `emb-cli` sont les seuls à tout assembler.
-- **Aucune dépendance GUI** en dehors de `emb-app`. Toute la logique métier doit être utilisable et testable sans interface.
+- Le graphe de dépendances est **acyclique et descendant** : `emb-core` ne dépend d'aucun autre crate du projet ; `emb-app`, `emb-mcp` et `emb-cli` sont les seuls à tout assembler, et ne contiennent aucune logique métier.
+- **Aucune dépendance GUI** en dehors de `emb-app`. Toute la logique métier, aperçu compris (`emb-render` produit des images sans fenêtre), doit être utilisable et testable sans interface.
 - Les crates de bibliothèque n'effectuent **aucune I/O cachée** : ils prennent des `impl Read`/`impl Write` ou des tampons, jamais des chemins codés en dur.
 - Toute nouvelle dépendance externe doit être justifiée (maintenance, licence compatible, taille). Préférer les crates établis.
 
 ### Abstractions clés
 - Un trait par capacité, par exemple :
   ```rust
-  pub trait FormatReader { fn read(&self, input: &mut dyn Read) -> Result<StitchPattern, FormatError>; }
-  pub trait FormatWriter { fn write(&self, pattern: &StitchPattern, out: &mut dyn Write) -> Result<(), FormatError>; }
+  // Les lecteurs et écrivains renvoient aussi leurs avertissements (ADR 0001).
+  pub trait FormatReader { fn read(&self, input: &mut dyn Read) -> Result<ReadOutput, FormatError>; }
+  pub trait FormatWriter { fn write(&self, pattern: &StitchPattern, out: &mut dyn Write) -> Result<WriteOutput, FormatError>; }
   pub trait StitchGenerator { fn generate(&self, shape: &Shape, params: &StitchParams) -> Result<Vec<Stitch>, StitchError>; }
   ```
 - Ajouter un format ou un type de point = ajouter un module qui implémente le trait, **sans modifier** les autres implémentations.
@@ -68,13 +75,16 @@ embroidery/
 - Respecter les contraintes machine : longueur maximale de point par format (ex. ±12,1 mm pour DST — découper en sauts sinon), longueur minimale (éliminer les micro-points), densité maximale.
 
 ### Génération de points
-- Types à supporter progressivement : point droit (running), triple point, satin, remplissage tatami/fill, avec angle, densité et décalage de rangées paramétrables.
+- Types à supporter progressivement : point droit (running), triple point, satin, remplissage à angle libre (tatami), puis remplissages en contour, rayonnant, à motif, en spirale et guidé par une courbe (FEATURES §4.3), avec densité et décalage de rangées paramétrables.
+- **Le sens du fil est un paramètre de premier rang** : angle en degrés, 0° = horizontal, sens trigonométrique, de 0° inclus à 180° exclu. C'est lui qui donne le relief (FEATURES §4.2).
+- Les points ne sont jamais la vérité : ils sont **générés** à partir des objets du design et régénérés à chaque modification (FEATURES §2.2).
 - **Sous-couche (underlay)** : center-walk, edge-walk, zigzag, configurables.
-- **Compensation de tirage (pull compensation)** et ordre de couture optimisé (minimiser sauts et coupes).
+- **Compensation de tirage (pull compensation)**, recouvrement entre zones voisines, points d'arrêt et ordre de couture optimisé (minimiser sauts et coupes).
+- Ces réglages techniques ont des valeurs par défaut qui donnent un motif brodable sans intervention : l'utilisateur visé ne les connaît pas (FEATURES §4.4). Une valeur par défaut n'est déclarée fiable qu'après un essai sur tissu (FEATURES §10.2).
 - Chaque paramètre a une valeur par défaut documentée, une plage valide, et une validation qui renvoie une erreur claire hors plage.
 
 ### Formats machine
-- Priorité : DST (Tajima), PES/PEC (Brother), EXP (Melco), JEF (Janome), puis VP3, XXX…
+- Priorité : lecture PES (Brother) et écriture JEF (Janome), DST (Tajima) déjà en place. Les autres formats ne sont ajoutés que sur besoin réel (CONVERSION §2.2).
 - Chaque format a une note dans `docs/formats/<format>.md` : structure, en-têtes, encodage des coordonnées, limites, particularités des couleurs.
 - Les parseurs **ne paniquent jamais** sur une entrée malformée : ils renvoient une erreur typée.
 
@@ -155,7 +165,7 @@ Invariants à vérifier sur des entrées générées, par exemple :
    cargo test --doc --workspace
    cargo insta test --workspace   # aucune snapshot en attente
    ```
-5. Résumer : ce qui a changé, tests ajoutés, éventuelles snapshots modifiées et leur justification.
+5. Résumer : ce qui a changé, tests ajoutés, éventuelles snapshots modifiées et leur justification. Si le corpus privé (`tests/fixtures/private/`) est absent, le dire : les tests `private_corpus` passent alors sans rien vérifier.
 6. Mettre à jour `CHANGELOG.md` (format Keep a Changelog) et la documentation si l'API publique change.
 7. Une décision d'architecture importante (nouveau crate, nouvelle dépendance majeure, changement de modèle de données) → ADR dans `docs/adr/NNNN-titre.md`.
 
@@ -165,10 +175,9 @@ Invariants à vérifier sur des entrées générées, par exemple :
 
 La CI (GitHub Actions ou équivalent) exécute sur Linux, Windows et macOS :
 - fmt, clippy, tests, doctests, snapshots ;
-- `cargo deny` (licences, vulnérabilités, doublons) et `cargo audit` ;
-- couverture et comparaison avec la branche principale ;
-- fuzzing court (quelques minutes par cible) ;
-- vérification de la MSRV.
+- `cargo deny` (licences, vulnérabilités RustSec, doublons, sources : il couvre ce que ferait `cargo audit`) ;
+- vérification de la MSRV ;
+- couverture comparée à la branche principale et fuzzing court (quelques minutes par cible) : pas encore en place, voir `docs/TODO.md`.
 
 Aucune fusion si une étape échoue.
 

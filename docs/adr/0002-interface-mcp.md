@@ -1,8 +1,8 @@
 # ADR 0002 — Interface MCP : un client mince des bibliothèques
 
-- **Statut** : accepté
+- **Statut** : accepté, amendé par l'[ADR 0003](0003-numerisation-pilotable-par-ia.md) (le serveur expose aussi le modèle de design et passe au jalon 3)
 - **Date** : 2026-10-22
-- **Contexte fonctionnel** : FEATURES §5.3 (interface MCP), §1.4 (rapport de conversion).
+- **Contexte fonctionnel** : FEATURES §6 (pilotage par une IA ; §5.3 à la rédaction), CONVERSION §1.4 (rapport de conversion).
 
 ## Contexte
 

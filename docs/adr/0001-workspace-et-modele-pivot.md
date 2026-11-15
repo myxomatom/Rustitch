@@ -2,7 +2,7 @@
 
 - **Statut** : accepté
 - **Date** : 2026-10-22
-- **Contexte fonctionnel** : FEATURES §1 (moteur de conversion), jalon 1.
+- **Contexte fonctionnel** : CONVERSION §1 (moteur de conversion ; FEATURES §1 à la rédaction), jalon 1.
 
 ## Contexte
 
@@ -24,7 +24,7 @@ Les écrivains quantifient d'abord (arrondi des positions absolues, fonction uni
 
 ### 4. Lecteurs et écrivains renvoient des avertissements
 
-Écart assumé par rapport à l'exemple de trait de `CLAUDE.md` : `FormatReader::read` renvoie `ReadOutput { pattern, warnings }` et `FormatWriter::write` renvoie `WriteOutput { warnings }`. La lecture tolérante (FEATURES §1.5) et le futur rapport de conversion (§1.4) exigent de remonter chaque perte ou approximation de façon typée (`Warning`) plutôt que par des logs.
+Écart assumé par rapport à l'exemple de trait de `CLAUDE.md` : `FormatReader::read` renvoie `ReadOutput { pattern, warnings }` et `FormatWriter::write` renvoie `WriteOutput { warnings }`. La lecture tolérante (CONVERSION §1.5) et le futur rapport de conversion (§1.4) exigent de remonter chaque perte ou approximation de façon typée (`Warning`) plutôt que par des logs.
 
 ### 5. CIEDE2000 dès le jalon 1
 

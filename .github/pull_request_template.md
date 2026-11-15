@@ -1,6 +1,6 @@
 ## Objectif
 
-<!-- Une modification = un objectif clair (CLAUDE.md §1). Lier l'entrée de docs/FEATURES.md ou docs/TODO.md concernée. -->
+<!-- Une modification = un objectif clair (CLAUDE.md §1). Lier l'entrée de docs/FEATURES.md, docs/CONVERSION.md ou docs/TODO.md concernée. -->
 
 ## Changements
 
