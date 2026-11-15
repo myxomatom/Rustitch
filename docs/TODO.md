@@ -15,7 +15,7 @@ Toute la chaîne se termine par un JEF : tant qu'il n'est pas validé sur machin
 
 ## 2. Reste du jalon 1 : conversion PES → JEF
 
-- **Corpus réel** (CONVERSION §6.2, §4.5) : 5 paires DST/JEF reçues le 2026-10-22, leurs PES jumeaux et `Birds6x10.PES`, dans `tests/fixtures/private/` (non versionné : droits de redistribution inconnus, donc absent de la CI). Testé par `private_corpus`. Manque un corpus redistribuable pour la CI.
+- **Corpus réel** (CONVERSION §6.2, §4.5) : 5 paires DST/JEF reçues le 2026-10-22, leurs PES jumeaux et `Birds6x10.PES`, dans `tests/fixtures/private/` (non versionné : droits de redistribution inconnus, donc absent de la CI). Testé par `private_corpus`. Manque un corpus redistribuable pour la CI. Le mainteneur prévoit d'ajouter en local un corpus plus large de fichiers existants, pour comparer les conversions : prévoir alors la conversion par lot et `emb diff` (CONVERSION §5.1), et un rapport de comparaison sur tout le corpus.
 - **Drapeaux JEF `0x14` / `0x0A`** et octets 0x16–0x17 : à comprendre et à conserver.
 - **Aller-retour JEF octet pour octet sur le corpus** (CONVERSION §4.5) : atteint pour les données de points de la famille `0x0A`, pour les index de couleur et pour le bloc `ENHANCE` ; restent les drapeaux, le code de cadre et les octets 0x16–0x17 de l'en-tête, ainsi que le préfixe des sauts de la famille `0x14`.
 - **Marque des fils en JEF** : le bloc `ENHANCE` ne la stocke pas (« Madeira Classic 40 » est perdu, signalé). Option envisageable : fiche de fils annexe (CONVERSION §4.3).
@@ -28,7 +28,7 @@ Toute la chaîne se termine par un JEF : tant qu'il n'est pas validé sur machin
 Voir FEATURES §12. Chaque décision d'architecture donne lieu à un ADR ; l'[ADR 0003](adr/0003-numerisation-pilotable-par-ia.md) (recentrage) est à valider.
 
 - Ordre des jalons 3 (socle IA), 4 (application) et 5 (images et bouton « Numériser »).
-- Jalon 2 : représentation des formes et des objets, algorithmes de remplissage et de satin, sources métier pour les valeurs par défaut (densité, compensation, sous-couches) ; liste et dessin des motifs de référence (FEATURES §10.2).
+- Jalon 2 : découpé en 24 tâches dans [jalons/jalon-2.md](jalons/jalon-2.md), à valider. Les décisions (crates, bibliothèques, convention SVG) sont la tâche J2-01, les valeurs par défaut et leurs sources la tâche J2-02.
 - Jalon 3 : format du fichier projet ; SDK MCP (`rmcp`) à justifier.
 - Jalon 4 : bibliothèque d'interface graphique.
 - Jalon 5 : méthode de vectorisation des images.

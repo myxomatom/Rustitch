@@ -318,7 +318,7 @@ Tout le détail (formats, couleurs, cadres, rapport, ligne de commande, recette 
 ☐ Numérisation automatique d'un logo courant en quelques secondes au plus.
 
 ### 10.2 Qualité et non-régression
-☐ **Motifs de référence** versionnés, chacun avec son entrée, ses points attendus (golden files) et son aperçu attendu :
+☐ **Motifs de référence** dessinés pour le projet, donc versionnés et testés en CI, chacun avec son entrée, ses points attendus (golden files) et son aperçu attendu :
 - mire d'angles : le même carré, même fil, brodé dans huit sens ;
 - soleil à rayons, chaque rayon dans son sens ;
 - silhouette d'une seule couleur découpée en sous-zones ;
@@ -326,6 +326,7 @@ Tout le détail (formats, couleurs, cadres, rapport, ligne de commande, recette 
 - détails fins et petit texte ;
 - un motif par type de remplissage.
 
+☐ **Images réelles** (logos et dessins que l'on veut vraiment broder) : beaucoup sont protégées par le droit d'auteur et ne peuvent pas être redistribuées. Elles restent sur la machine du mainteneur, dans `tests/fixtures/private/`, hors du dépôt public ; leurs tests ne tournent qu'en local et le disent quand ils n'ont rien vérifié.
 ☐ **Recette sur tissu** : à chaque jalon de numérisation, les motifs de référence sont brodés sur la machine d'essai ; résultats et photos consignés dans `docs/acceptance/` (machine, fil, tissu, date). Toute valeur par défaut du moteur s'appuie sur une recette.
 ☐ Tests de propriétés du moteur : points dans la forme, longueurs respectées, déterminisme (CLAUDE.md §5.2).
 ☐ Tout motif qui a mal brodé devient une fixture de régression.
@@ -346,7 +347,7 @@ Tout le détail (formats, couleurs, cadres, rapport, ligne de commande, recette 
 Chaque jalon livre quelque chose d'utilisable et se clôt par une recette.
 
 1. **Conversion PES → JEF validée sur machine** (◐ : le code est en place, voir [TODO.md](TODO.md)). Reste la recette sur la machine d'essai ([acceptance/janome.md](acceptance/janome.md)) et les corrections qui en sortiront.
-2. **Moteur de points** : modèle d'objets (§2.1, §2.2), import SVG (§3.2), point droit, satin et remplissage à angle libre avec découpe en sous-zones (§4.1 à §4.3), qualité technique de base (§4.4), diagnostics, aperçu réaliste en PNG (§7), commande en ligne de commande. Recette : mire d'angles et soleil brodés.
+2. **Moteur de points** (découpage en tâches : [jalons/jalon-2.md](jalons/jalon-2.md)) : modèle d'objets (§2.1, §2.2), import SVG (§3.2), point droit, satin et remplissage à angle libre avec découpe en sous-zones (§4.1 à §4.3), qualité technique de base (§4.4), diagnostics, aperçu réaliste en PNG (§7), commande en ligne de commande. Recette : mire d'angles et soleil brodés.
 3. **Socle « prêt pour l'IA »** : commandes et annulation (§2.3), fichier projet (§2.4), serveur MCP sans interface (§6). Recette : une IA numérise le soleil à partir d'un SVG et d'une consigne.
 4. **Application** : première version de l'éditeur (§8.1). Recette : le parcours §1.3 à la souris.
 5. **Images à aplats et bouton « Numériser »** : import d'images (§3.1), numérisation automatique (§5), ordre de couture (§4.5). Recette : le parcours §1.1 sur trois logos, brodés.
