@@ -11,3 +11,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # The toolchain tag of the msrv job is the MSRV (rust-version in
+      # Cargo.toml), changed by hand only; the test job follows @stable.
+      # The action also publishes tags for future Rust versions (1.120…).
+      - dependency-name: dtolnay/rust-toolchain

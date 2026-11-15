@@ -38,6 +38,7 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnage [
 
 - JEF : par défaut, deux fils distincts ne reçoivent plus le même index Janome (golden file `near_neutrals_jef` mis à jour : blancs cassés → White et Ivory White, noir et anthracite → Black et Dark Sepia). Le texte de l'avertissement `ThreadApproximated` ne parle plus de « nearest ».
 - `jef::palette::nearest_palette_entry` est remplacée par `jef::palette::match_threads`.
+- Dependabot ne propose plus de mises à jour de `dtolnay/rust-toolchain` : l'étiquette du job `msrv` est la MSRV de `Cargo.toml`, changée à la main (la PR #2 la passait à 1.120, version inexistante).
 - Message `DesignTooLarge` : « dépasse tous les cadres connus » au lieu de « le plus grand cadre », la table de cadres étant incomplète.
 
 ### Fixed
