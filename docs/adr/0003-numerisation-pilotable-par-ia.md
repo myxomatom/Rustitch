@@ -44,11 +44,11 @@ Le rendu réaliste (éclairage dépendant du sens du fil) produit une image à p
 
 ### 6. Un socle déterministe sans IA
 
-Le bouton « Numériser » applique des règles intégrées, déterministes, sans connexion. L'IA ajoute les choix d'auteur par-dessus, par les mêmes commandes. L'application ne dépend d'aucun service extérieur.
+Le bouton « Numériser » applique des règles intégrées, déterministes, sans connexion. L'IA ajoute les choix d'auteur par-dessus, par les mêmes commandes : soit de l'extérieur, par MCP, soit depuis l'application, en **option** du bouton (FEATURES §5.1, décidé le 2026-11-15). L'application ne dépend d'aucun service extérieur : sans IA configurée, elle reste complète.
 
 ## Ce que cet ADR ne décide pas
 
-Chacun de ces points fera l'objet de son propre ADR, au jalon indiqué dans FEATURES §12 : bibliothèque d'interface graphique, format du fichier projet, méthode de vectorisation des images, mécanisme de connexion de l'IA à l'application ouverte, appel éventuel d'une IA depuis l'application.
+Chacun de ces points fera l'objet de son propre ADR, au jalon indiqué dans FEATURES §12 : bibliothèque d'interface graphique, format du fichier projet, méthode de vectorisation des images, mécanisme de connexion de l'IA à l'application ouverte, service et configuration de l'option IA du bouton « Numériser ».
 
 ## Conséquences
 

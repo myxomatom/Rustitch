@@ -216,6 +216,12 @@ Le bouton « Numériser » (§1.1) enchaîne l'import (§3) et un premier jeu de
 
 Ces choix sont des règles simples : ils donnent un motif propre et brodable. Les choix d'auteur (quel sens pour quel effet, où couper une zone) sont le domaine de l'utilisateur et de l'IA (§6).
 
+### 5.1 Numérisation assistée par une IA, en option (P1)
+☐ L'utilisateur peut demander que le bouton « Numériser » confie les choix d'auteur à une IA : après la numérisation intégrée, l'IA ajuste les sens, les types de remplissage et les découpes, par les mêmes commandes et les mêmes outils que le §6.
+☐ C'est une **option, jamais une obligation** : désactivée tant que l'utilisateur ne l'a pas configurée, et l'application reste complète sans elle (§0.4, principe 7).
+☐ Ce que l'IA a changé est visible, et annulable en une fois pour revenir au résultat intégré.
+☐ Si l'IA est injoignable ou échoue, le résultat intégré est conservé et l'utilisateur en est informé.
+
 ---
 
 ## 6. Pilotage par une IA (P0)
@@ -344,7 +350,7 @@ Chaque jalon livre quelque chose d'utilisable et se clôt par une recette.
 3. **Socle « prêt pour l'IA »** : commandes et annulation (§2.3), fichier projet (§2.4), serveur MCP sans interface (§6). Recette : une IA numérise le soleil à partir d'un SVG et d'une consigne.
 4. **Application** : première version de l'éditeur (§8.1). Recette : le parcours §1.3 à la souris.
 5. **Images à aplats et bouton « Numériser »** : import d'images (§3.1), numérisation automatique (§5), ordre de couture (§4.5). Recette : le parcours §1.1 sur trois logos, brodés.
-6. **Remplissages et confort** : en contour, rayonnant, à motif (§4.3), tissus (§4.6), fils de l'utilisateur (§3.3), IA dans l'application ouverte (§6.3), simulation de couture, fiche de production.
+6. **Remplissages et confort** : en contour, rayonnant, à motif (§4.3), tissus (§4.6), fils de l'utilisateur (§3.3), IA dans l'application ouverte (§6.3) et en option du bouton « Numériser » (§5.1), simulation de couture, fiche de production.
 7. **Plus tard** : spirale et remplissage guidé, édition des contours, texte, autres formats (CONVERSION §2.2), photos (§3.4).
 
 ---
@@ -358,7 +364,7 @@ Chaque jalon livre quelque chose d'utilisable et se clôt par une recette.
 | Modèle exact de la machine d'essai (« eXpressive », famille Janome) et version de son logiciel interne | 1 |
 | Ordre des jalons 3, 4 et 5 : l'IA avant l'application, ou l'inverse ? | 3 |
 | Format et extension du fichier projet | 3 |
-| Le bouton « Numériser » doit-il pouvoir appeler une IA depuis l'application (clé d'accès, coût), en plus de la numérisation intégrée ? | 5 |
+| Option IA du bouton « Numériser » (§5.1) : quel service, comment l'utilisateur le configure (clé d'accès, coût) | 6 |
 | Bibliothèque d'interface graphique | 4 |
 | Méthode de vectorisation des images (bibliothèque existante ou code propre) | 5 |
 | Mécanisme de connexion de l'IA à l'application ouverte | 6 |

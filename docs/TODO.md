@@ -46,6 +46,9 @@ Voir FEATURES §12. Chaque décision d'architecture donne lieu à un ADR ; l'[AD
 
 ## 5. Outillage
 
+- **Tests du corpus privé muets** : sans les fichiers de `tests/fixtures/private/` (CI, sessions de développement dans le cloud), les 9 tests `private_corpus` passent sans rien vérifier. Une régression sur les fichiers réels n'y est donc pas détectée. À traiter par un corpus redistribuable (§2) ; en attendant, lancer ces tests en local avant toute fusion qui touche `emb-formats`.
+- **Règles de dépendances entre crates vérifiées par la machine** (`CLAUDE.md` §2) : dès la création du quatrième crate, un test sur `cargo metadata` (graphe descendant, aucune logique dans `emb-app`/`emb-mcp`/`emb-cli`) et une interdiction `cargo-deny` des bibliothèques graphiques hors de `emb-app`.
+- **Découpage des jalons** : avant de coder un jalon, le découper en tâches d'un objectif chacune, avec critère d'acceptation et tests attendus (`CLAUDE.md` §1.6).
 - Cibles `cargo-fuzz` pour les lecteurs DST, JEF et PES (CONVERSION §4.5, `CLAUDE.md` §5.5). En attendant, des tests `proptest` vérifient l'absence de panique sur octets arbitraires et sur fichiers corrompus.
 - Benchmark `criterion` : 100 000 points en moins de 200 ms (CONVERSION §6.1).
 - CI : couverture `cargo llvm-cov` et fuzzing court (`CLAUDE.md` §7). `cargo-deny` (licences, failles RustSec, doublons, sources) est en place ; il couvre aussi ce que ferait `cargo audit`.

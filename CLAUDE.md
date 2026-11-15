@@ -165,7 +165,7 @@ Invariants à vérifier sur des entrées générées, par exemple :
    cargo test --doc --workspace
    cargo insta test --workspace   # aucune snapshot en attente
    ```
-5. Résumer : ce qui a changé, tests ajoutés, éventuelles snapshots modifiées et leur justification.
+5. Résumer : ce qui a changé, tests ajoutés, éventuelles snapshots modifiées et leur justification. Si le corpus privé (`tests/fixtures/private/`) est absent, le dire : les tests `private_corpus` passent alors sans rien vérifier.
 6. Mettre à jour `CHANGELOG.md` (format Keep a Changelog) et la documentation si l'API publique change.
 7. Une décision d'architecture importante (nouveau crate, nouvelle dépendance majeure, changement de modèle de données) → ADR dans `docs/adr/NNNN-titre.md`.
 
