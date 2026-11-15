@@ -1,0 +1,17 @@
+[package]
+name = "emb-core"
+description = "Core types for embroidery: units, geometry, colours, threads and the pivot stitch pattern model."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

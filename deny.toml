@@ -1,0 +1,37 @@
+# cargo-deny configuration (CLAUDE.md §7): run with `cargo deny check`.
+
+[graph]
+all-features = true
+
+[advisories]
+# RustSec security advisories; yanked crates are refused.
+yanked = "deny"
+
+[licenses]
+# Licences compatible with the project's GPL-3.0-or-later.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "GPL-3.0-or-later",
+    "ISC",
+    "MIT",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.9
+# The list anticipates future dependencies: unused entries are not reported.
+unused-allowed-license = "allow"
+
+[bans]
+# Several versions of one crate are allowed but reported.
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

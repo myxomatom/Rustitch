@@ -1,0 +1,8 @@
+# Same line endings on every OS: golden files and rustfmt checks must not
+# depend on the platform that checked the repository out.
+* text=auto eol=lf
+*.jef binary
+*.dst binary
+*.pes binary
+*.pec binary
+*.png binary
