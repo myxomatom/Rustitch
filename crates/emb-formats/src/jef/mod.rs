@@ -37,7 +37,7 @@ const ESCAPE: u8 = 0x80;
 const COLOR_CHANGE: u8 = 0x01;
 const JUMP: u8 = 0x02;
 const END: u8 = 0x10;
-/// ΔE00 above which a palette substitution is reported (FEATURES §3.4).
+/// ΔE00 above which a palette substitution is reported (CONVERSION §3.4).
 const APPROXIMATION_WARNING_DELTA_E: f64 = 3.0;
 /// Half sizes, in machine units, of the hoops whose edge distances the
 /// header records (110 × 110, 50 × 50, 140 × 200 twice).
@@ -104,8 +104,8 @@ pub struct JefWriter {
     /// Append the `ENHANCE` block with the real threads (colour, catalogue
     /// number, name) after the end marker (on by default).
     pub enhance: bool,
-    /// Hoop to write, instead of the smallest known hoop that fits (FEATURES
-    /// §4.2). Its code is written as is; the design must fit in it.
+    /// Hoop to write, instead of the smallest known hoop that fits
+    /// (CONVERSION §4.2). Its code is written as is; the design must fit in it.
     pub hoop: Option<Hoop>,
 }
 

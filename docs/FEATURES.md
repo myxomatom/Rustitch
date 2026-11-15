@@ -1,288 +1,365 @@
-# Spécification des fonctionnalités — Logiciel de broderie professionnel
+# Spécification du produit — Rustitch
 
-> Document de référence fonctionnelle. À lire avec `rules.md` (règles de code et de tests).
-> Chaque fonctionnalité porte une priorité : **P0** (indispensable, premier jalon) → **P3** (plus tard).
+> Document de référence fonctionnelle : ce que Rustitch doit faire, pour qui, et dans quel ordre.
+> À lire avec [CONVERSION.md](CONVERSION.md) (export machine et conversion de fichiers) et [CLAUDE.md](../CLAUDE.md) (règles de code et de tests).
+> Priorités : **P0** (nécessaire à la première version utilisable) · **P1** (juste après) · **P2** (plus tard) · **P3** (un jour).
 > Statut : ☐ à faire · ◐ en cours · ☑ terminé.
+> Révision du 2026-11-15 : le produit est recentré sur la numérisation ([ADR 0003](adr/0003-numerisation-pilotable-par-ia.md)).
 
 ---
 
-## 0. Vision et priorité absolue
+## 0. Vision
 
-**La fonctionnalité prioritaire est la conversion fidèle entre tous les formats de broderie des différentes marques de machines.**
+### 0.1 Le produit en une phrase
 
-Le logiciel doit être capable de lire un fichier de n'importe quelle marque et de l'écrire dans n'importe quel autre format **sans perte perceptible** : même géométrie au dixième de millimètre près, même nombre et même ordre de blocs de couleur, mêmes coupes et sauts, et des couleurs de fil restituées le plus fidèlement possible, **y compris lorsque plusieurs fils ont des couleurs proches**.
+Rustitch est une **application de numérisation de broderie pour non-professionnels** : elle transforme un dessin ou un logo en un motif brodable de vraie qualité, où **le sens et le type de remplissage donnent du relief à l'image**, et elle est conçue dès le départ pour qu'**une IA puisse la piloter** aussi bien qu'un humain.
 
-Une attention toute particulière est portée à l'export vers **JEF** et **JEF+** (Janome).
+### 0.2 Pour qui
 
-### Critères de réussite globaux
-- Une conversion A → B → A ne dérive pas : écart de position ≤ 0,1 mm sur chaque point, sans accumulation d'erreur.
-- Aucun bloc de couleur n'est fusionné, supprimé ou réordonné.
-- Deux fils distincts dans le fichier source restent distincts dans le fichier cible, sauf impossibilité signalée explicitement.
-- Chaque conversion produit un **rapport de conversion** listant toute perte ou approximation.
+| Utilisateur | Ce qu'il attend |
+|---|---|
+| **La personne qui brode chez elle** (utilisateur principal) | Possède une machine familiale. Ne connaît pas le vocabulaire du métier (sous-couche, compensation, densité) et ne veut pas régler trente paramètres. Veut un bon résultat sur tissu, et pouvoir retoucher à la souris ce qui ne lui plaît pas. |
+| **Une IA** (utilisateur de premier rang) | Connectée par le Model Context Protocol (MCP). Doit pouvoir lire le motif, le voir, le modifier et vérifier son travail, sans interface graphique et sans analyser du texte libre. |
+| La personne qui a téléchargé un motif | Veut broder sur sa machine Janome un fichier PES trouvé sur internet, avec les bonnes couleurs (CONVERSION). |
 
----
+### 0.3 Ce qui fait la différence
 
-## 1. Moteur de conversion (P0)
+Une machine familiale offre peu de couleurs par motif : **c'est le remplissage qui fait la qualité**. Un même fil brodé dans deux directions ne renvoie pas la lumière de la même façon ; les brodeurs professionnels s'en servent pour détacher deux zones d'une seule couleur (le corps et la patte d'un animal sur un logo de vêtement de sport) ou pour donner un mouvement (les rayons d'un soleil brodés chacun dans son sens).
 
-### 1.1 Modèle pivot
-☑ Toutes les conversions passent par un modèle interne unique (`StitchPattern`) : N lecteurs + N écrivains, jamais de convertisseur direct format à format.
+Rustitch met ce savoir-faire à la portée d'un débutant :
 
-Le modèle pivot doit conserver **plus d'informations que n'importe quel format** pour ne rien perdre en transit :
-- coordonnées absolues en mm (`f64`), jamais en deltas ;
-- type de chaque point : `Normal`, `Jump`, `Trim`, `ColorChange`, `Stop`, `SequinEject`, `End` ;
-- liste ordonnée des blocs de couleur, chacun associé à un `Thread` complet (voir §3.1) ;
-- métadonnées : nom du design, auteur, commentaires, cadre (hoop) d'origine, date ;
-- une table d'extensions `format → données brutes` pour les informations propres à un format (permet un aller-retour sans perte dans le même format).
+- le **sens du fil** est un réglage de premier rang, visible et modifiable d'un geste, zone par zone ;
+- plusieurs **types de remplissage** permettent de varier la texture avec un seul fil (§4.3) ;
+- la **technique invisible** qui fait qu'une broderie ne fronce pas et ne laisse pas voir le tissu (sous-couches, compensation, densité, ordre de couture) est appliquée automatiquement (§4.4) ;
+- l'**aperçu** montre le relief avant de broder (§7) ;
+- une **IA** peut faire les choix artistiques à la place de l'utilisateur, ou avec lui (§6).
 
-### 1.2 Quantification sans dérive
-☑ La conversion vers les unités machine (généralement 0,1 mm) se fait en **arrondissant les positions absolues**, puis en calculant les deltas entre positions arrondies. Interdiction d'arrondir les deltas successifs (cela accumule l'erreur).
-☑ Test de propriété : sur un motif de 100 000 points aléatoires, l'écart maximal entre position source et position exportée reste ≤ 0,05 mm.
+### 0.4 Principes de conception
 
-### 1.3 Contraintes de chaque format
-☑ Chaque écrivain déclare ses capacités dans une structure `FormatCapabilities` :
-- longueur maximale de déplacement par enregistrement ;
-- résolution des coordonnées ;
-- support natif des coupes (trim), des arrêts (stop), des paillettes ;
-- modèle de couleur : aucune couleur / index de palette fixe / RGB / référence catalogue ;
-- nombre maximal de couleurs et de points ;
-- tailles de cadre supportées.
+1. **Le résultat sur tissu est le juge.** Une fonctionnalité de numérisation n'est terminée que lorsque ses motifs de référence ont été brodés et jugés bons (§10.2).
+2. **Des objets, pas des points.** L'utilisateur et l'IA manipulent des formes et leurs réglages ; les points sont toujours recalculés par le moteur (§2).
+3. **Parité humain / IA.** Tout ce qui se fait à la souris se fait par un outil MCP, et inversement : les deux passent par les mêmes commandes (§2.3, §6).
+4. **Des réglages par défaut qui marchent.** Sans rien régler, le motif est brodable. Les réglages experts existent mais ne sont jamais obligatoires.
+5. **Toujours retouchable.** La numérisation automatique et l'IA proposent ; l'utilisateur peut tout corriger et tout annuler.
+6. **Rien n'est perdu en silence.** Toute approximation, à la numérisation comme à l'export, est signalée par un diagnostic à code stable.
+7. **Fonctionne sans internet et sans IA.** L'IA est un plus, jamais une condition.
+8. **Déterminisme.** Une même entrée produit exactement les mêmes points.
 
-◐ Avant écriture, une passe de **normalisation** adapte le motif aux capacités :
-- découpage des points trop longs en sauts intermédiaires (répartis régulièrement, jamais un reste minuscule en fin) ;
-- traduction des coupes quand le format ne les supporte pas nativement (stratégie configurable, documentée par format) ;
-- suppression optionnelle des micro-points (< seuil paramétrable), désactivée par défaut pour la fidélité.
+### 0.5 Critères de réussite
 
-### 1.4 Rapport de conversion
-☐ Chaque conversion produit un rapport (texte, JSON et HTML) contenant :
-- statistiques source / cible : nombre de points, sauts, coupes, changements de couleur, dimensions ;
-- écart géométrique maximal et moyen ;
-- table de correspondance des couleurs avec l'écart perceptuel ΔE2000 de chaque fil ;
-- avertissements : fils fusionnés, couleurs hors tolérance, informations non transposables (paillettes, noms de fils…) ;
-- cadre choisi.
+- **Parcours complet** : à partir d'un logo à aplats de 8 couleurs au plus, une personne sans connaissance du métier obtient un fichier JEF brodable sans modifier un seul réglage technique.
+- **Qualité sur tissu** (motifs de référence, §10.2) : pas de jour entre deux zones voisines, pas de fronces, contours nets, détails lisibles, pas de fil sauté visible.
+- **Relief** : deux zones voisines brodées avec le même fil dans deux directions différentes se distinguent à l'œil, sur l'aperçu comme sur le tissu.
+- **Parité** : toute commande d'édition est exposée à la fois par l'application et par le serveur MCP ; un test automatique le vérifie.
+- **IA** : à partir d'une image de référence et d'une consigne en langage courant, une IA connectée par MCP produit un motif valide et l'exporte sans intervention humaine.
+- **Export** : les critères de CONVERSION §0 sont respectés.
 
-### 1.5 Robustesse de lecture
-◐ Lecture tolérante : un fichier légèrement corrompu ou tronqué est lu jusqu'à la dernière donnée valide, avec un avertissement, sans jamais paniquer.
-◐ Détection automatique du format par signature binaire, l'extension n'étant qu'un indice.
-☐ Gestion des variantes et versions d'un même format (voir §2).
+### 0.6 Hors périmètre
+
+- **Les photos** en entrée directe. Elles pourront passer plus tard par un pré-traitement confié à une IA (réduction des couleurs, simplification) avant la numérisation (§3.4).
+- **La conversion universelle** entre tous les formats de toutes les marques (CONVERSION §0).
+- Les besoins de **production industrielle** : machines multi-têtes, gestion d'atelier, chiffrage.
+- Les techniques spéciales : appliqué, paillettes, broderie 3D sur mousse, dentelle.
+- Les comptes, le stockage en ligne et l'application mobile.
+- La promesse d'une numérisation parfaite en un clic : le résultat automatique est un bon point de départ, toujours retouchable.
 
 ---
 
-## 2. Formats à supporter
+## 1. Parcours utilisateur
 
-Légende : **L** lecture · **É** écriture.
+Les fonctionnalités des sections suivantes existent pour servir ces parcours.
 
-### 2.1 P0 — Formats prioritaires
-| Marque | Format | L | É | Remarques |
-|---|---|---|---|---|
-| Janome / Elna / Kenmore | **.jef** | ◐ | ◐ | Couleurs = index dans la palette Janome. Voir §4. |
-| Janome | **.jef+** | ☐ | ☐ | Format étendu peu documenté. Voir §4.6. |
-| Brother / Baby Lock / Bernina deco | .pes | ◐ | ☐ | Plusieurs versions (v1 à v6) ; contient une section PEC. Écrire au minimum v1 (compatibilité) et une version récente avec fils RGB. |
-| Brother | .pec | ☐ | ☐ | Couleurs = index dans la palette Brother. |
-| Tajima | .dst | ◐ | ◐ | Pas d'information de couleur ; coupes encodées par séquences de sauts. Fichier de couleurs annexe optionnel. |
-| Melco / Bernina | .exp | ☐ | ☐ | Pas de couleur dans le fichier. |
-| Husqvarna Viking / Pfaff | .vp3 | ☐ | ☐ | Fils RGB avec nom, marque et référence catalogue. |
-| Singer | .xxx | ☐ | ☐ | Couleurs RGB. |
+### 1.1 Numériser une image (parcours principal, P0)
+1. L'utilisateur ouvre une image (logo, dessin à aplats) et indique la taille voulue ou le cadre de sa machine.
+2. Il clique sur **« Numériser »** : l'application découpe l'image en zones de couleur et propose pour chacune un type de point, un sens de fil et un fil.
+3. L'aperçu réaliste montre le résultat, relief compris.
+4. Il retouche ce qu'il veut : tourner le sens d'un remplissage à la souris, changer de type de remplissage, couper une zone en deux pour leur donner deux directions.
+5. Il exporte en JEF et brode.
 
-### 2.2 P1 — Formats courants
-| Marque | Format | L | É |
-|---|---|---|---|
-| Husqvarna Viking | .hus, .vip, .shv | ☐ | ☐ |
-| Pfaff | .pcs, .pcd, .pcm, .pcq | ☐ | ☐ |
-| Janome | .sew, .jpx | ☐ | ☐ |
-| Brother | .phc, .phb | ☐ | — |
-| Tajima | .dsb, .dsz, .tbf | ☐ | ☐ |
-| Barudan | .u01 | ☐ | ☐ |
-| Toyota | .10o, .100 | ☐ | ☐ |
-| Happy | .tap | ☐ | ☐ |
-| ZSK | .z00 / .zsk | ☐ | ☐ |
-| Melco | .cnd | ☐ | — |
-| Poem / Singer | .csd | ☐ | ☐ |
+### 1.2 Numériser avec une IA (P0)
+1. L'utilisateur demande à son assistant IA, connecté à Rustitch par MCP, de numériser une image, avec ses envies (« les rayons du soleil chacun dans son sens, le fond en damier »).
+2. L'IA crée et règle les objets avec les mêmes commandes que l'application, regarde l'aperçu, lit les diagnostics et corrige.
+3. L'utilisateur voit le résultat dans l'application, le retouche ou demande des changements, puis exporte.
 
-### 2.3 P2 — Formats d'échange et utilitaires
-☐ Export SVG (tracé des points), PNG (aperçu), PDF (fiche de production avec couleurs et ordre de couture).
-☐ Import/export CSV et JSON (format texte lisible, utile pour le débogage et les tests).
-☐ Fichiers de couleurs annexes : `.inf`, `.edr`, `.rgb`, `.col`.
+### 1.3 Retoucher un motif numérisé (P0)
+Rouvrir un projet, modifier un sens de fil, un type de remplissage, une couleur ou l'ordre de couture, voir l'aperçu se mettre à jour, exporter à nouveau.
 
-### 2.4 Hors périmètre (sauf décision contraire)
-- Formats propriétaires chiffrés (ex. `.art` Bernina) : à étudier uniquement si une documentation légale existe. Ne jamais contourner un chiffrement.
-
-### 2.5 Sources de documentation
-- Chaque format possède sa fiche `docs/formats/<format>.md` : structure de l'en-tête, encodage des points, commandes, limites, variantes connues, sources.
-- Sources de référence à croiser : bibliothèques open source **pyembroidery** et **libembroidery** (respecter leurs licences : s'en inspirer pour comprendre la structure, ne pas copier de code incompatible), documentations des fabricants, et surtout **fichiers réels** produits par les logiciels officiels.
-- Toute affirmation sur un format non confirmée par au moins un fichier réel est marquée « à vérifier » dans la fiche.
+### 1.4 Broder un motif téléchargé (P0)
+Ouvrir un fichier PES, vérifier l'aperçu, les couleurs et le cadre, l'exporter en JEF. Un fichier de points ne contient pas d'objets : on peut le voir, le placer et le convertir, pas en changer les remplissages.
 
 ---
 
-## 3. Gestion des couleurs et des fils (P0)
+## 2. Modèle de design (P0)
 
-La fidélité des couleurs est le point le plus délicat de la conversion, car les formats utilisent des modèles incompatibles : certains ne stockent aucune couleur (DST, EXP), d'autres un index dans une palette fixe du fabricant (JEF, PEC), d'autres du RGB avec références catalogue (VP3, PES récent).
+### 2.1 Objets
+☐ Un **design** est une liste ordonnée d'**objets**. Chaque objet porte :
+- une **forme** (contour fermé avec trous éventuels, ou tracé ouvert), en millimètres ;
+- un **type de point** et ses réglages (§4), dont le **sens du fil** ;
+- un **fil** (`Thread`, CONVERSION §3.1) ;
+- un **identifiant stable** et un **nom** libre (« rayon 3 », « patte arrière »), pour qu'un humain et une IA parlent du même objet.
 
-### 3.1 Modèle de fil
-☑ Structure `Thread` :
-- couleur sRGB ;
-- nom ;
-- marque et nuancier (Madeira, Isacord, Robison-Anton, Sulky, Gunold, Janome, Brother…) ;
-- référence catalogue ;
-- poids/type de fil (optionnel).
+☐ L'**ordre des objets** est l'ordre de couture.
+☐ Le design porte aussi : la taille finale, le cadre visé, le tissu (§4.6), l'image d'origine en calque de référence et les métadonnées.
 
-### 3.2 Distance perceptuelle
-☑ Toute comparaison de couleurs utilise **CIEDE2000 (ΔE00)** dans l'espace CIELAB (illuminant D65), **jamais une distance euclidienne en RGB**, qui distingue mal les couleurs proches.
-☑ Conversion sRGB → linéaire → XYZ → Lab testée contre des valeurs de référence publiées (jeu de test officiel de Sharma pour CIEDE2000).
+### 2.2 Des points toujours recalculés
+☐ Les points ne sont jamais stockés comme vérité : ils sont **générés** à partir des objets. Modifier un réglage régénère les points de l'objet concerné.
+☐ Le résultat de la génération est un `StitchPattern` (modèle pivot, CONVERSION §1.1), seule entrée des écrivains de formats.
+☐ Un fichier de points importé (PES, DST, JEF) est un design sans objets : affichable, plaçable et exportable (§1.4).
 
-### 3.3 Nuanciers
-☐ Nuanciers intégrés et versionnés : palette Janome, palette Brother, et principaux nuanciers commerciaux.
-☐ Tables de correspondance entre nuanciers (ex. Madeira ↔ Janome). Quand la référence catalogue source est connue, elle prime sur la couleur RGB pour choisir le fil cible.
-☐ Nuanciers importables/éditables par l'utilisateur (son stock de fils réel).
+### 2.3 Commandes
+☐ Toute modification d'un design est une **commande** : nommée, typée, validée avant exécution, sérialisable, annulable.
+☐ L'application graphique et le serveur MCP n'ont **aucun autre moyen** de modifier un design.
+☐ Annuler / rétablir illimité, commun aux actions de l'humain et de l'IA.
+☐ Une commande refusée renvoie une erreur à code stable qui dit quoi corriger (valeur hors plage, objet inconnu…).
 
-### 3.4 Algorithme de correspondance des couleurs
-Trois stratégies, sélectionnables, la stratégie **fidèle** étant celle par défaut :
-
-1. ☑ **Plus proche voisin** (simple) : chaque fil source → entrée de palette au ΔE minimal. Rapide, mais peut attribuer le même index à deux fils proches : réservé au mode « aperçu rapide ».
-2. ☑ **Affectation optimale injective** (par défaut) : on cherche l'affectation des fils source distincts vers des entrées de palette **distinctes** qui minimise la somme des ΔE (algorithme hongrois / Kuhn-Munkres). Ainsi, deux fils proches mais différents dans la source restent deux fils différents dans la cible.
-3. ☐ **Préservation du contraste** (option) : en plus de l'injectivité, pénaliser les affectations qui inversent l'ordre de clarté (L*) ou de teinte entre deux fils proches, pour que le dégradé ou le relief voulu reste lisible.
-
-Règles communes :
-☑ Identité des fils : deux blocs utilisent « le même fil » s'ils ont la même couleur **et** la même référence ; sinon ce sont des fils distincts, même à ΔE < 1.
-☑ Si le nombre de fils distincts dépasse la taille de la palette, fusionner en priorité les paires au plus faible ΔE et le signaler dans le rapport.
-◐ Seuils d'alerte configurables (par défaut : avertissement si ΔE00 > 3, erreur bloquante optionnelle si > 8).
-☐ Surcharge manuelle : l'utilisateur peut forcer l'affectation de n'importe quel fil ; ses choix sont mémorisés par design.
-☑ Déterminisme : à égalité de coût, départage par index de palette croissant.
-
-### 3.5 Formats sans couleur
-☐ À la lecture d'un DST/EXP, utiliser le fichier de couleurs annexe s'il existe, sinon une palette par défaut contrastée, et le signaler.
-☐ À l'écriture vers un format sans couleur, générer en option le fichier annexe et la fiche de production.
+### 2.4 Fichier projet
+☐ Format natif documenté et versionné : objets, réglages, fils, image d'origine. Texte lisible et déterministe (deux enregistrements du même design sont identiques).
+☐ Un projet enregistré par une version reste lisible par les suivantes (migrations testées).
 
 ---
 
-## 4. Conversion vers JEF et JEF+ (P0 — soin particulier)
+## 3. Import d'images
 
-### 4.1 Contraintes du format JEF à respecter
-☑ Coordonnées en 0,1 mm, deltas signés sur un octet ; tout déplacement plus long est découpé.
-◐ Commandes de contrôle (changement de couleur, déplacement, fin) encodées selon la fiche `docs/formats/jef.md`, établie et vérifiée sur des fichiers produits par les logiciels Janome.
-☑ Axe Y : vérifier le sens par rapport au modèle pivot avec une fixture asymétrique (ex. la lettre « F ») — un motif inversé doit faire échouer un test.
-◐ En-tête cohérent : décalage des données, date, nombre de couleurs, nombre de points, code du cadre et emprises (extents) calculées à partir du motif réel.
-☑ Table des couleurs : un index de palette Janome par bloc, dans l'ordre exact des blocs, plus le champ de type de fil associé.
+### 3.1 Images à aplats (P0)
+☐ Formats : PNG, JPEG, BMP ; images comportant peu de couleurs (logos, dessins, pictogrammes).
+☐ **Réduction des couleurs** vers un nombre choisi par l'utilisateur (défaut proposé d'après l'image, 8 au plus), avec nettoyage du lissage des bords et du bruit de compression.
+☐ **Découpage en zones** d'une seule couleur, puis **vectorisation** en contours lisses.
+☐ Nettoyage : fusion ou suppression des zones trop petites pour être brodées (seuil en millimètres, à la taille finale), signalées par un diagnostic.
+☐ Choix du fond : la couleur de fond peut être laissée non brodée (tissu apparent).
+☐ La taille finale en millimètres est demandée à l'import : tous les seuils en dépendent.
 
-### 4.2 Choix du cadre (hoop)
-◐ Sélection automatique du plus petit cadre Janome contenant le motif, centré.
-◐ Choix manuel ou par modèle de machine cible (profils de machines Janome avec leurs cadres disponibles).
-☑ Erreur explicite si le motif dépasse le plus grand cadre de la machine ciblée (jamais de troncature silencieuse).
+### 3.2 Dessins vectoriels (P0)
+☐ Import SVG : formes remplies et tracés, couleurs, ordre d'empilement. C'est l'entrée la plus fiable, et la première développée (jalon 2).
 
-### 4.3 Fidélité des couleurs vers JEF
-Le JEF ne stocke qu'un index dans la palette Janome : c'est là que les couleurs proches risquent d'être confondues.
+### 3.3 Des couleurs aux fils (P1)
+☐ Chaque couleur de l'image est associée au fil le plus proche (distance CIEDE2000, CONVERSION §3.2) dans un nuancier choisi.
+☐ « Mes fils » : l'utilisateur déclare les fils qu'il possède ; la numérisation se limite à ceux-là.
 
-☑ Utiliser par défaut l'**affectation optimale injective** (§3.4) sur la palette Janome.
-☑ Si la source contient des références de fils Janome, les reprendre telles quelles (correspondance exacte, ΔE ignoré).
-☐ Si la source contient des références d'autres marques, passer par les tables de correspondance de nuanciers avant de recourir au RGB.
-☑ Ne **jamais** fusionner deux blocs consécutifs, même s'ils obtiennent le même index : chaque changement de couleur source reste un arrêt machine (l'utilisateur peut avoir changé de fil volontairement).
-☐ Option « couleurs exactes » : générer à côté du JEF une **fiche de fils** (PDF/HTML/CSV) indiquant pour chaque bloc l'index Janome affiché par la machine **et** le fil réel d'origine (marque, référence, nom, échantillon de couleur), afin que la brodeuse enfile les vraies couleurs.
-☐ Aperçu côte à côte dans l'interface : couleurs d'origine / couleurs Janome attribuées, avec mise en évidence des paires de fils proches et de leur ΔE.
-
-### 4.4 JEF+
-☐ **Phase d'investigation obligatoire avant implémentation** : le JEF+ est un format étendu peu documenté publiquement.
-- Constituer un corpus de fichiers JEF+ produits par les logiciels Janome (avec, si possible, le JEF équivalent du même design).
-- Analyser les différences avec le JEF (données supplémentaires, informations de fils, objets éditables…).
-- Documenter les résultats et les incertitudes dans `docs/formats/jef-plus.md` et consigner la décision dans un ADR.
-- Rétro-ingénierie uniquement par observation de fichiers (approche « salle blanche »), sans désassemblage de logiciel propriétaire.
-☐ Lecture : extraire au minimum les points et les couleurs ; conserver les données non comprises dans la table d'extensions pour un aller-retour JEF+ → JEF+ à l'identique.
-☐ Écriture : produire un JEF+ que les machines et logiciels Janome acceptent ; tant que la validation sur matériel n'est pas faite, la fonctionnalité est marquée **expérimentale** dans l'interface.
-☐ Si le JEF+ permet de stocker plus d'informations de couleur que le JEF, les exploiter pour améliorer la fidélité.
-
-### 4.5 Tests spécifiques JEF / JEF+
-◐ Aller-retour JEF → pivot → JEF identique octet pour octet sur le corpus de référence (hors champ date, normalisé dans les tests).
-◐ Matrice de conversion : chaque format P0 → JEF, comparée à des fichiers attendus (golden files).
-◐ Fixtures de **couleurs proches** :
-  - dégradé de 8 bleus avec ΔE00 de 1,5 à 3 entre voisins ;
-  - deux blancs cassés différents ;
-  - deux noirs (noir et gris anthracite très sombre) ;
-  - motif contenant plus de fils distincts que la palette (vérifier les fusions signalées).
-  Vérifier : aucune fusion non signalée, ordre de clarté conservé en mode contraste, rapport correct.
-☑ Fixture asymétrique pour le sens des axes.
-◐ Fuzzing du lecteur JEF et JEF+.
-☐ **Recette sur machine réelle** : checklist manuelle dans `docs/acceptance/janome.md` (chargement sur la machine, affichage du cadre, nombre de couleurs, rendu brodé comparé à l'original). Les résultats sont consignés avec le modèle de machine et la version du firmware.
+### 3.4 Photos (hors périmètre, piste)
+Une photo devra d'abord être ramenée à un dessin à aplats (peu de couleurs, formes simplifiées). Ce pré-traitement sera confié à une IA, en amont de l'import §3.1 ; il n'est pas planifié.
 
 ---
 
-## 5. Interface de conversion (P0)
+## 4. Génération de points (P0)
 
-### 5.1 Ligne de commande (`emb-cli`)
-◐ `emb convert entree.pes sortie.jef` avec options : stratégie de couleur, cadre, machine cible, nuancier, seuils ΔE, rapport.
-☐ Conversion par lot d'un dossier entier, avec rapport consolidé.
-☑ `emb info fichier` : format détecté, version, statistiques, couleurs.
-☐ `emb validate fichier --machine <modele>` : vérifie la compatibilité avec une machine.
-☐ `emb diff a.jef b.jef` : comparaison géométrique et colorimétrique de deux fichiers.
-☑ Codes de sortie distincts : succès, succès avec avertissements, échec.
+Le moteur transforme chaque objet en points. C'est lui qui garantit que le motif est brodable, quels que soient les choix de l'utilisateur ou de l'IA.
 
-### 5.2 Interface graphique (P1)
-☐ Glisser-déposer de fichiers ou de dossiers, choix du format cible, conversion par lot.
-☐ Aperçu avant/après avec la table de correspondance des couleurs éditable.
-☐ Affichage du rapport de conversion.
+### 4.1 Types de points
+| Type | Usage | Priorité |
+|---|---|---|
+| ☐ **Point droit** (running), simple ou triple | Contours, traits fins, détails | P0 |
+| ☐ **Satin** | Formes étroites, bordures, lettres : points d'un bord à l'autre, très brillants | P0 |
+| ☐ **Remplissage** | Formes larges, avec un sens de fil et une texture (§4.3) | P0 |
 
-### 5.3 Interface MCP (P1)
-L'application est **« MCP native »** : un modèle de langage (LLM) doit pouvoir l'utiliser directement, via le Model Context Protocol, avec les mêmes garanties de fidélité que la CLI. Approche : [ADR 0002](adr/0002-interface-mcp.md).
+☐ Le moteur propose le type d'après la forme (étroite → satin, large → remplissage, trait → point droit) ; l'utilisateur ou l'IA peuvent le changer.
+☐ Un satin trop large pour être brodé d'un seul point est découpé automatiquement ; un choix impossible (satin sur une très grande surface) est signalé avec une solution proposée.
 
-☐ Serveur MCP (crate `emb-mcp`, transport stdio) exposant des outils : `list_formats`, `info`, `convert`, `match_colors`, puis `validate` et `diff`.
-☐ Aucune logique propre au serveur : il appelle le même service de conversion que la CLI (détection du format, options, rapport).
-☐ Résultats structurés : rapport de conversion JSON (§1.4) avec **codes d'avertissement stables** (ex. `thread_approximated`) ; schémas JSON des entrées et sorties de chaque outil.
-☐ Sécurité : accès aux fichiers limité à des dossiers autorisés, taille et durée maximales par appel, aucun écrasement de fichier sans paramètre explicite.
-☐ Déterminisme et absence de toute interaction (aucune question posée en cours d'opération).
-☐ Tests de bout en bout : appels d'outils sur les fixtures, comparés à des snapshots.
+### 4.2 Sens du fil et relief
+☐ Chaque remplissage a un **sens du fil** : angle en degrés, 0° = horizontal, sens trigonométrique (Y vers le haut), de 0° inclus à 180° exclu.
+☐ Une forme peut être **découpée en sous-zones** par un trait, chaque sous-zone ayant son propre sens et son propre type : c'est l'outil de base du relief à couleur égale.
+☐ Le sens d'un satin suit la forme (perpendiculaire à son axe) ; il peut être incliné.
+☐ Deux zones voisines de même fil ne reçoivent jamais le même sens par défaut (§5).
+
+### 4.3 Remplissages
+| Remplissage | Effet | Priorité |
+|---|---|---|
+| ☐ **À angle libre** (tatami) | Rangées parallèles dans le sens choisi ; le remplissage de base | P0 |
+| ☐ **En contour** | Les rangées suivent le bord de la forme, vers l'intérieur | P1 |
+| ☐ **Rayonnant** | Les points partent d'un centre, comme un soleil | P1 |
+| ☐ **À motif** | Damier de carreaux aux sens alternés, chevrons, losanges : une texture visible avec un seul fil | P1 |
+| ☐ **En spirale** | Une ligne continue du bord vers le centre | P2 |
+| ☐ **Guidé par une courbe** | Le sens du fil suit une ou plusieurs lignes tracées dans la forme (fourrure, vagues, drapé) | P2 |
+
+Pour chaque remplissage :
+☐ réglages utiles exposés en clair (sens, espacement des rangées, longueur des points, taille des carreaux…), chacun avec une valeur par défaut documentée, une plage valide et une erreur claire hors plage ;
+☐ les points restent à l'intérieur de la forme (à la compensation près) et respectent les longueurs minimale et maximale ;
+☐ le décalage des rangées évite les alignements de piqûres qui dessineraient des lignes parasites.
+
+### 4.4 Qualité technique automatique
+Ce que l'utilisateur débutant ne règle jamais, et que le moteur fait pour lui :
+
+☐ **Sous-couches** : points de stabilisation brodés avant la couche visible (bord, centre, zigzag, remplissage léger), choisies d'après le type et la taille de l'objet.
+☐ **Compensation du tirage** : le fil tire le tissu et rétrécit les formes dans le sens des points ; les formes sont élargies d'autant.
+☐ **Recouvrement** entre zones voisines, pour qu'aucun jour n'apparaisse à leur frontière.
+☐ **Densité** adaptée au fil, bornée pour ne ni laisser voir le tissu ni le cartonner.
+☐ **Points d'arrêt** au début et à la fin de chaque objet et avant chaque coupe.
+☐ **Longueurs de points** : pas de micro-points, découpage des points trop longs, raccourcissement dans les courbes serrées des satins.
+☐ **Détails trop petits** (trait plus fin qu'un fil, zone de moins d'un millimètre) : adaptés si possible, sinon signalés.
+
+Chaque réglage automatique reste visible et modifiable dans un panneau « expert ». Les valeurs par défaut sont des valeurs de départ, **validées par les essais sur tissu** (§10.2) avant d'être déclarées fiables.
+
+### 4.5 Ordre de couture
+☐ Ordre proposé : du fond vers le premier plan, en regroupant les couleurs pour limiter les changements de fil.
+☐ Points d'entrée et de sortie de chaque objet choisis pour limiter les sauts et les coupes ; trajets cachés sous les zones qui seront recouvertes.
+☐ L'utilisateur et l'IA peuvent réordonner ; un ordre qui dégrade le résultat (un fond brodé par-dessus un détail) est signalé.
+
+### 4.6 Tissu (P1)
+☐ L'utilisateur choisit son tissu dans une courte liste (coton tissé, jersey extensible, éponge, polaire…) ; ce choix règle la compensation, les sous-couches et la densité à sa place.
+
+### 4.7 Diagnostics
+☐ La génération renvoie des **diagnostics** à code stable, avec l'objet concerné et un message clair : densité excessive, forme trop petite, satin trop large, trop de coupes, motif plus grand que le cadre…
+☐ Statistiques : nombre de points, de couleurs, de coupes, dimensions, temps de broderie estimé, longueur de fil par couleur.
 
 ---
 
-## 6. Visualisation (P1)
+## 5. Numérisation automatique (P0)
 
-☐ Aperçu réaliste : épaisseur et brillance du fil, relief, ombrage.
-☐ Mode « plan » : points, sauts et coupes en couleurs distinctes.
-☐ Simulation de couture animée avec vitesse réglable.
-☐ Statistiques : temps de broderie estimé, consommation de fil par couleur, nombre de coupes.
-☐ Zoom, mesure de distances, affichage du cadre.
+Le bouton « Numériser » (§1.1) enchaîne l'import (§3) et un premier jeu de choix, sans IA et sans connexion :
+
+☐ type de point d'après la largeur de chaque forme (§4.1) ;
+☐ sens du fil d'après la forme (son grand axe), en donnant des sens **différents** à deux zones voisines du même fil pour qu'elles se détachent ;
+☐ fils (§3.3), ordre de couture (§4.5), sous-couches et compensation (§4.4) ;
+☐ contours : option pour border les zones d'un point droit ou d'un satin.
+
+☐ Le résultat est un ensemble d'**objets** entièrement retouchables, jamais une simple suite de points.
+☐ Le traitement est déterministe et borné en durée ; un motif trop complexe (trop de zones, détails trop fins pour la taille demandée) est signalé avec des pistes (agrandir, réduire le nombre de couleurs).
+
+Ces choix sont des règles simples : ils donnent un motif propre et brodable. Les choix d'auteur (quel sens pour quel effet, où couper une zone) sont le domaine de l'utilisateur et de l'IA (§6).
 
 ---
 
-## 7. Édition de base (P2)
+## 6. Pilotage par une IA (P0)
 
-☐ Déplacement, rotation, mise à l'échelle (avec recalcul de la densité, pas une simple homothétie des points).
-☐ Réordonnancement, fusion et suppression de blocs de couleur.
-☐ Combinaison de plusieurs designs.
-☐ Ajout de texte avec polices de broderie.
+Rustitch est conçu pour être utilisé par un modèle de langage via le **Model Context Protocol**. Approche : [ADR 0002](adr/0002-interface-mcp.md) et [ADR 0003](adr/0003-numerisation-pilotable-par-ia.md).
+
+### 6.1 Ce qu'une IA doit pouvoir faire
+| Besoin | Outils (noms indicatifs) |
+|---|---|
+| ☐ **Lire** le design sous forme structurée : objets, formes, surfaces, voisinages, réglages, fils | `describe_design`, `get_object` |
+| ☐ **Voir** : obtenir une image de l'aperçu (design entier ou un objet), en mode réaliste, plan ou sens des fils (§7) | `render` |
+| ☐ **Créer et modifier** : toutes les commandes du §2.3 | `import_image`, `digitize`, `split_object`, `set_stitch_type`, `set_fill`, `set_angle`, `set_thread`, `reorder`, `rename`, `undo`… |
+| ☐ **Vérifier** : diagnostics et statistiques (§4.7) | `check`, `stats` |
+| ☐ **Exporter et convertir** : écrire un fichier machine avec son rapport ; inspecter et convertir un fichier existant | `export`, `info`, `convert`, `list_formats`, `match_colors` |
+
+☐ **Parité** : la liste des outils d'édition est dérivée de la liste des commandes ; un test échoue si une commande n'est pas exposée.
+
+### 6.2 Pensé pour un modèle
+☐ Entrées et sorties **structurées**, avec schémas JSON publiés ; millimètres et degrés partout ; identifiants d'objets stables.
+☐ Erreurs et diagnostics à **codes stables** en `snake_case`, accompagnés de la marche à suivre (CONVERSION §1.4 pour le rapport de conversion).
+☐ **Guide de numérisation** fourni par le serveur (ressource MCP) : les conventions de Rustitch et les règles du métier utiles pour bien choisir (quand préférer un satin, comment détacher deux zones de même fil, quels sens pour quel effet).
+☐ Boucle **agir → voir → corriger** : chaque modification peut être suivie d'un aperçu et de diagnostics, pour que le modèle contrôle son propre travail.
+☐ Aucune question posée en cours d'opération ; mêmes entrées, mêmes résultats.
+☐ Descriptions d'outils courtes et sans ambiguïté ; un outil = une action.
+
+### 6.3 Deux façons de se connecter
+☐ **Sans interface** (P0) : le serveur travaille sur un fichier projet ; utilisable seul, par exemple dans une chaîne automatisée.
+☐ **Dans l'application ouverte** (P1) : l'IA agit sur le design affiché ; l'utilisateur voit chaque modification en direct et peut l'annuler.
+
+### 6.4 Garde-fous
+☐ Accès aux fichiers limité à des dossiers autorisés ; taille de fichier et durée d'opération bornées ; aucun écrasement de fichier sans paramètre explicite.
+☐ Tests de bout en bout : scénarios d'appels d'outils sur les fixtures, comparés à des snapshots.
+
+---
+
+## 7. Aperçu (P0)
+
+L'aperçu remplace l'essai sur tissu pendant le travail ; il sert à l'utilisateur comme à l'IA.
+
+☐ **Aperçu réaliste** : épaisseur du fil et, surtout, **éclairage dépendant du sens du fil**, pour que le relief se voie. Critère : deux zones du même fil à 0° et à 90° ont une luminosité mesurablement différente.
+☐ **Mode plan** : points, sauts et coupes en couleurs distinctes.
+☐ **Mode sens des fils** : hachures ou flèches indiquant la direction de chaque objet.
+☐ Couleur du tissu de fond, affichage du cadre et de ses limites.
+☐ Rendu **sans interface graphique**, vers une image PNG, déterministe (testable par golden files, utilisable par le serveur MCP).
+☐ Statistiques affichées (§4.7).
+☐ Simulation de couture animée, à vitesse réglable (P1).
+☐ Relief et ombrage du fil plus poussés, texture du tissu (P2).
+☐ Fiche de production imprimable : aperçu, fils dans l'ordre, cadre (P1 ; CONVERSION §4.3).
+
+---
+
+## 8. Application graphique (P0)
+
+Une application de bureau, dans l'esprit des visionneuses de broderie gratuites, avec l'édition des objets en plus.
+
+### 8.1 Première version (P0)
+☐ Ouvrir une image, un SVG, un projet ou un fichier de points (PES, JEF, DST) ; enregistrer le projet.
+☐ Zone de travail : zoom, déplacement, cadre affiché, image d'origine en calque (visible, estompée ou masquée).
+☐ Bascule aperçu réaliste / plan / sens des fils (§7).
+☐ Bouton **« Numériser »** (§5).
+☐ Liste des objets dans l'ordre de couture : sélection, renommage, réordonnancement, suppression.
+☐ Sur l'objet sélectionné : **poignée pour tourner le sens du fil à la souris**, choix du type de point et du remplissage dans une galerie illustrée, choix du fil.
+☐ Outil pour **couper une forme** en sous-zones (§4.2).
+☐ Placement du motif : déplacer, tourner, redimensionner (les points sont régénérés, la densité reste correcte).
+☐ Choix du cadre et de la machine ; export (CONVERSION §4).
 ☐ Annuler / rétablir illimité.
+☐ Diagnostics affichés sur l'objet concerné, avec la correction proposée.
+☐ Vocabulaire simple, infobulles ; panneau « expert » replié par défaut.
+
+### 8.2 Ensuite
+☐ Édition des contours point par point (P1).
+☐ Tracer une forme à la main par-dessus l'image (P1).
+☐ Combiner plusieurs designs (P1).
+☐ Panneau montrant les actions de l'IA en direct (P1, avec §6.3).
+☐ Texte avec polices de broderie (P2).
+☐ Mesure de distances (P2).
 
 ---
 
-## 8. Numérisation (digitizing) (P3)
+## 9. Export et conversion (P0)
 
-☐ Import SVG et images matricielles.
-☐ Génération de points : droit, triple, satin, remplissage tatami, avec angle et densité.
-☐ Sous-couches (underlay), compensation de tirage, optimisation de l'ordre de couture.
-☐ Numérisation automatique assistée à partir d'une image.
+☐ Un design numérisé s'exporte par la chaîne objets → points → `StitchPattern` → écrivain de format, avec les mêmes garanties et le même rapport qu'une conversion.
+☐ Format de la première version : **JEF**, pour la machine d'essai (famille Janome, cadres SQ20b, RE20b et RE28b). DST est déjà disponible.
+☐ Le motif est vérifié contre le cadre choisi avant l'export : jamais de troncature silencieuse.
 
----
-
-## 9. Exigences transverses
-
-### 9.1 Performance
-☐ Conversion d'un design de 100 000 points en moins de 200 ms (hors I/O disque), mesurée par benchmark.
-☐ Conversion par lot parallélisée (`rayon`).
-
-### 9.2 Qualité et non-régression
-☐ Corpus de référence versionné dans `tests/fixtures/` : au moins 5 fichiers réels par format P0, de sources variées.
-◐ Matrice de conversion automatisée : chaque format lisible → chaque format écrivable, avec vérification des invariants (géométrie, nombre de blocs, couleurs) et snapshots du rapport de conversion.
-☐ Tout fichier qui a posé problème devient une fixture de régression.
-
-### 9.3 Plateformes
-◐ Windows, macOS, Linux.
-☐ Bibliothèque de conversion utilisable seule (crate publiable) et, plus tard, en WebAssembly.
-
-### 9.4 Internationalisation
-☐ Interface en français et en anglais au minimum ; noms de fils dans la langue du nuancier.
+Tout le détail (formats, couleurs, cadres, rapport, ligne de commande, recette sur machine) est dans [CONVERSION.md](CONVERSION.md).
 
 ---
 
-## 10. Jalons proposés
+## 10. Exigences transverses
 
-1. **Jalon 1** (◐ en cours — reste le corpus réel et les points « à vérifier », voir `docs/TODO.md`) : modèle pivot, quantification, lecture/écriture DST et JEF, CLI `convert`/`info`, matrice de tests.
-2. **Jalon 2** : PES/PEC, EXP, VP3, XXX ; gestion des couleurs complète (CIEDE2000, affectation injective, nuanciers) ; rapport de conversion (JSON à codes stables, service de conversion partagé : prérequis de l'interface MCP).
-3. **Jalon 3** : investigation puis support JEF+ ; fiche de fils ; recette sur machines Janome.
-4. **Jalon 4** : formats P1, interface MCP (§5.3), interface graphique de conversion, aperçu.
-5. **Jalon 5** : édition, puis numérisation.
+### 10.1 Performance
+☐ Modifier un réglage régénère l'objet et rafraîchit l'aperçu sans attente perceptible sur un motif courant (objectif : moins de 100 ms pour un objet de 10 000 points, à mesurer par benchmark).
+☐ Numérisation automatique d'un logo courant en quelques secondes au plus.
+
+### 10.2 Qualité et non-régression
+☐ **Motifs de référence** versionnés, chacun avec son entrée, ses points attendus (golden files) et son aperçu attendu :
+- mire d'angles : le même carré, même fil, brodé dans huit sens ;
+- soleil à rayons, chaque rayon dans son sens ;
+- silhouette d'une seule couleur découpée en sous-zones ;
+- aplats voisins de couleurs différentes (jours, recouvrement) ;
+- détails fins et petit texte ;
+- un motif par type de remplissage.
+
+☐ **Recette sur tissu** : à chaque jalon de numérisation, les motifs de référence sont brodés sur la machine d'essai ; résultats et photos consignés dans `docs/acceptance/` (machine, fil, tissu, date). Toute valeur par défaut du moteur s'appuie sur une recette.
+☐ Tests de propriétés du moteur : points dans la forme, longueurs respectées, déterminisme (CLAUDE.md §5.2).
+☐ Tout motif qui a mal brodé devient une fixture de régression.
+
+### 10.3 Plateformes et distribution
+◐ Windows, macOS, Linux (bibliothèques et ligne de commande testées en CI sur les trois).
+☐ Application installable sans outil de développement (installeur ou exécutable par système), Windows en premier.
+☐ Licence GPL-3.0-or-later.
+
+### 10.4 Langues
+☐ Interface en français et en anglais ; noms de fils dans la langue du nuancier.
+☐ Messages de diagnostic traduisibles ; les codes, eux, ne changent pas.
+
+---
+
+## 11. Jalons
+
+Chaque jalon livre quelque chose d'utilisable et se clôt par une recette.
+
+1. **Conversion PES → JEF validée sur machine** (◐ : le code est en place, voir [TODO.md](TODO.md)). Reste la recette sur la machine d'essai ([acceptance/janome.md](acceptance/janome.md)) et les corrections qui en sortiront.
+2. **Moteur de points** : modèle d'objets (§2.1, §2.2), import SVG (§3.2), point droit, satin et remplissage à angle libre avec découpe en sous-zones (§4.1 à §4.3), qualité technique de base (§4.4), diagnostics, aperçu réaliste en PNG (§7), commande en ligne de commande. Recette : mire d'angles et soleil brodés.
+3. **Socle « prêt pour l'IA »** : commandes et annulation (§2.3), fichier projet (§2.4), serveur MCP sans interface (§6). Recette : une IA numérise le soleil à partir d'un SVG et d'une consigne.
+4. **Application** : première version de l'éditeur (§8.1). Recette : le parcours §1.3 à la souris.
+5. **Images à aplats et bouton « Numériser »** : import d'images (§3.1), numérisation automatique (§5), ordre de couture (§4.5). Recette : le parcours §1.1 sur trois logos, brodés.
+6. **Remplissages et confort** : en contour, rayonnant, à motif (§4.3), tissus (§4.6), fils de l'utilisateur (§3.3), IA dans l'application ouverte (§6.3), simulation de couture, fiche de production.
+7. **Plus tard** : spirale et remplissage guidé, édition des contours, texte, autres formats (CONVERSION §2.2), photos (§3.4).
+
+---
+
+## 12. Questions ouvertes
+
+À trancher avant le jalon concerné ; chaque décision d'architecture fera l'objet d'un ADR.
+
+| Question | Pour le jalon |
+|---|---|
+| Modèle exact de la machine d'essai (« eXpressive », famille Janome) et version de son logiciel interne | 1 |
+| Ordre des jalons 3, 4 et 5 : l'IA avant l'application, ou l'inverse ? | 3 |
+| Format et extension du fichier projet | 3 |
+| Le bouton « Numériser » doit-il pouvoir appeler une IA depuis l'application (clé d'accès, coût), en plus de la numérisation intégrée ? | 5 |
+| Bibliothèque d'interface graphique | 4 |
+| Méthode de vectorisation des images (bibliothèque existante ou code propre) | 5 |
+| Mécanisme de connexion de l'IA à l'application ouverte | 6 |
+| Nuanciers de fils à intégrer en premier | 6 |

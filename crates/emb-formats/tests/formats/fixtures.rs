@@ -1,4 +1,4 @@
-//! Synthetic designs exercising the conversion invariants (FEATURES §4.5).
+//! Synthetic designs exercising the conversion invariants (CONVERSION §4.5).
 
 use emb_core::{
     Mm, Point, Rgb, Stitch, StitchKind, StitchPattern, Thread, Timestamp, delta_e_2000,

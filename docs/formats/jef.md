@@ -2,7 +2,7 @@
 
 Implémentation : [`crates/emb-formats/src/jef/`](../../crates/emb-formats/src/jef/).
 
-> **Statut de vérification** : la structure est recoupée entre pyembroidery et libembroidery, mais **n'a pas encore été confirmée sur des fichiers produits par les logiciels Janome**, ni sur machine (FEATURES §4.1 et §4.5). Les points « à vérifier » sont bloquants pour passer les fonctionnalités JEF au statut ☑.
+> **Statut de vérification** : la structure est recoupée entre pyembroidery et libembroidery, puis comparée à 5 fichiers réels de producteurs inconnus (voir « Observations sur fichiers réels ») ; elle **n'a pas encore été vérifiée sur machine** (CONVERSION §4.1 et §4.5). Les points « à vérifier » sont bloquants pour passer les fonctionnalités JEF au statut ☑.
 
 ## Vue d'ensemble
 
