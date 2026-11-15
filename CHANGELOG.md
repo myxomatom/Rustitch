@@ -32,6 +32,8 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnage [
 
 ### Changed
 
+- Spécifications recentrées sur la numérisation (revue des objectifs du 2026-11-15, [ADR 0003](docs/adr/0003-numerisation-pilotable-par-ia.md)) : `docs/FEATURES.md` décrit désormais le produit (application de numérisation pour non-professionnels, relief par le sens et le type de remplissage, pilotage par une IA via MCP, aperçu, éditeur graphique, nouveaux jalons) ; la conversion passe dans `docs/CONVERSION.md`, sections 1 à 5 non renumérotées, et se limite à PES → JEF (DST déjà en place), les autres formats et le JEF+ sortant du plan. `CLAUDE.md`, `README.md`, `docs/TODO.md` et les renvois « FEATURES § » du code et des ADR sont alignés. Aucun changement de comportement. L'appel d'une IA par le bouton « Numériser » est une option (FEATURES §5.1). Le jalon 2 (moteur de points) est découpé en 24 tâches dans `docs/jalons/jalon-2.md`.
+
 - JEF : le bloc `ENHANCE` est ajouté après le marqueur de fin (golden files `f_glyph_jef`, `long_moves_and_commands_jef` et `near_neutrals_jef` mis à jour : seul ce bloc s'ajoute, l'en-tête et les points sont inchangés).
 
 - JEF : par défaut, deux fils distincts ne reçoivent plus le même index Janome (golden file `near_neutrals_jef` mis à jour : blancs cassés → White et Ivory White, noir et anthracite → Black et Dark Sepia). Le texte de l'avertissement `ThreadApproximated` ne parle plus de « nearest ».

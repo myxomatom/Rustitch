@@ -1,6 +1,6 @@
 # Contribuer à Rustitch
 
-Les règles de code et de tests sont dans [CLAUDE.md](CLAUDE.md) ; les fonctionnalités attendues dans [docs/FEATURES.md](docs/FEATURES.md). Ce document décrit le circuit de travail.
+Les règles de code et de tests sont dans [CLAUDE.md](CLAUDE.md) ; les fonctionnalités attendues dans [docs/FEATURES.md](docs/FEATURES.md) (produit) et [docs/CONVERSION.md](docs/CONVERSION.md) (formats). Ce document décrit le circuit de travail.
 
 ## Circuit d'une modification
 

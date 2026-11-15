@@ -2,7 +2,7 @@
 
 Implémentation : [`crates/emb-formats/src/dst.rs`](../../crates/emb-formats/src/dst.rs).
 
-> **Statut de vérification** : la structure ci-dessous est confirmée par deux implémentations open source indépendantes, mais **pas encore par des fichiers produits par des logiciels du marché** (aucun corpus réel dans `tests/fixtures/` pour l'instant). Les points marqués « à vérifier » doivent l'être dès qu'un corpus est disponible.
+> **Statut de vérification** : la structure ci-dessous est confirmée par deux implémentations open source indépendantes, puis comparée à 5 fichiers réels de producteurs inconnus (voir « Observations sur fichiers réels »). Les points encore marqués « à vérifier » restent ouverts.
 
 ## Vue d'ensemble
 

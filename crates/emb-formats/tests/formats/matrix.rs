@@ -1,5 +1,5 @@
 //! Conversion matrix: every readable format to every writable format, on
-//! every fixture, checking the global invariants of FEATURES §0.
+//! every fixture, checking the global invariants of CONVERSION §0.
 
 use emb_core::{StitchKind, StitchPattern};
 use emb_formats::jef::PALETTE_EXTENSION;

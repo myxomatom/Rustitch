@@ -1,4 +1,4 @@
-//! Assignment of threads to the entries of a fixed palette (FEATURES §3.4).
+//! Assignment of threads to the entries of a fixed palette (CONVERSION §3.4).
 //!
 //! Two strategies:
 //!

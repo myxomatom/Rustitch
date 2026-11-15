@@ -1,8 +1,8 @@
 # Recette sur machine Janome
 
-Objectif : vérifier sur une vraie machine que les fichiers JEF écrits par Rustitch sont acceptés et brodés fidèlement, et trancher les points « à vérifier » de [jef.md](../formats/jef.md) (FEATURES §4.5).
+Objectif : vérifier sur une vraie machine que les fichiers JEF écrits par Rustitch sont acceptés et brodés fidèlement, et trancher les points « à vérifier » de [jef.md](../formats/jef.md) (CONVERSION §4.5).
 
-Machine visée : cadres **SQ20b** (200 × 200 mm), **RE20b** (170 × 200 mm) et **RE28b** (200 × 280 mm). Noms de fichiers sur **2 caractères**, sans caractère spécial.
+Machine d'essai : modèle « eXpressive » d'une marque de la famille Janome (modèle exact à noter au §2), cadres **SQ20b** (200 × 200 mm), **RE20b** (170 × 200 mm) et **RE28b** (200 × 280 mm). Noms de fichiers sur **2 caractères**, sans caractère spécial.
 
 ## 1. Préparer la clé USB
 

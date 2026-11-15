@@ -134,7 +134,7 @@ fn random_walk(steps: &[(f64, f64)]) -> StitchPattern {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(4))]
 
-    /// FEATURES §1.2: on 100 000 random points, no exported position is more
+    /// CONVERSION §1.2: on 100 000 random points, no exported position is more
     /// than 0.05 mm away from its source.
     #[test]
     fn quantization_error_stays_within_half_a_unit_on_100k_points(
