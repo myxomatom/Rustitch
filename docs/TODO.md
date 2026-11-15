@@ -40,4 +40,4 @@ Chaque entrée référence la section de [FEATURES.md](FEATURES.md) concernée. 
 
 - Cibles `cargo-fuzz` pour les lecteurs DST et JEF (§4.5, `CLAUDE.md` §5.5). En attendant, des tests `proptest` vérifient l'absence de panique sur octets arbitraires et sur fichiers corrompus.
 - Benchmark `criterion` : 100 000 points en moins de 200 ms (§9.1).
-- CI : `cargo deny`, `cargo audit`, couverture `cargo llvm-cov` (`CLAUDE.md` §7).
+- CI : couverture `cargo llvm-cov` et fuzzing court (`CLAUDE.md` §7). `cargo-deny` (licences, failles RustSec, doublons, sources) est en place ; il couvre aussi ce que ferait `cargo audit`.

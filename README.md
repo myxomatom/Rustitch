@@ -24,4 +24,4 @@ Codes de sortie : `0` succès, `3` succès avec avertissements (approximation ou
 | `crates/emb-formats` | Quantification, normalisation, lecteurs/écrivains DST et JEF, lecteur PES |
 | `crates/emb-cli` | Outil en ligne de commande `emb` |
 
-Règles de développement : [CLAUDE.md](CLAUDE.md). Fiches de formats : [docs/formats/](docs/formats/). Décisions d'architecture : [docs/adr/](docs/adr/).
+Règles de développement : [CLAUDE.md](CLAUDE.md). Circuit de travail (branches, PR, CI) : [CONTRIBUTING.md](CONTRIBUTING.md). Fiches de formats : [docs/formats/](docs/formats/). Décisions d'architecture : [docs/adr/](docs/adr/).

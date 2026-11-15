@@ -5,13 +5,21 @@ on:
     branches: [main]
   pull_request:
 
+# A new push to the same branch or pull request cancels the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
 
 jobs:
-  check:
-    name: ${{ matrix.os }}
+  test:
+    name: test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -33,10 +41,32 @@ jobs:
       - run: cargo insta test --workspace --all-features --check --unreferenced=reject
 
   msrv:
-    name: MSRV (1.85)
+    name: msrv (1.85)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-features --no-run
+
+  # Licences, security advisories (RustSec), duplicate crates and sources:
+  # configuration in deny.toml.
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  # Single check required by the branch protection of main: it passes only
+  # when every job above passed.
+  ci:
+    name: CI
+    if: always()
+    needs: [test, msrv, deny]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job passed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        run: exit 1
+      - run: echo "All checks passed"

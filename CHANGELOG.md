@@ -28,6 +28,8 @@ Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), versionnage [
 - Recette adaptée aux cadres SQ20b, RE20b et RE28b : noms de fichiers sur 2 caractères, sondes de codes de cadre (série H), tailles de cadre (série S), designs réels et témoins.
 - Service de conversion partagé `emb_formats::convert` (`detect`, `load`, `resolve_target`, `writer`, `convert`, `WriteOptions`, `ConvertError`) : la CLI n'en est plus qu'une façade, prête à être rejointe par le serveur MCP. Comportement de la CLI inchangé.
 
+- CI d'équipe : job récapitulatif `CI` exigé pour fusionner dans `main` (protection de branche), `cargo-deny` (`deny.toml`), annulation des exécutions périmées, modèle de pull request, Dependabot (dépendances et actions) et `CONTRIBUTING.md`.
+
 ### Changed
 
 - JEF : le bloc `ENHANCE` est ajouté après le marqueur de fin (golden files `f_glyph_jef`, `long_moves_and_commands_jef` et `near_neutrals_jef` mis à jour : seul ce bloc s'ajoute, l'en-tête et les points sont inchangés).
